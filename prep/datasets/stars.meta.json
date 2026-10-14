@@ -1,0 +1,19 @@
+{
+  "title": "HYG Database: named stars",
+  "about": [
+    {
+      "name": "HYG (Hipparcos-Yale-Gliese) Database",
+      "quote": "HYG combines every identifiable star in the HIPPARCOS, Yale Bright Star, and Gliese (nearby star) catalogs into a combined dataset of the stars' currently best-known positions, brightnesses, spectral types, and various additional catalog IDs such as traditional names and Bayer designations.",
+      "url": "https://codeberg.org/astronexus/hyg",
+      "label": "Astronomy Nexus (Codeberg)"
+    }
+  ],
+  "here": "Here: the 450 brightest HYG v4.1 stars that have a proper name (the Sun and four stars with unknown distance left out), as their 3-D position around the Sun with distance squashed to log10(1 + light-years) so a few far supergiants don't swamp everything (A), and as their direction on the sky, a point on a sphere (B).",
+  "cite": ["hyg"],
+  "refs": {
+    "hyg": {
+      "text": "Nash, D. (2024). The HYG Database, v4.1. Astronomy Nexus. CC BY-SA 4.0.",
+      "url": "https://codeberg.org/astronexus/hyg"
+    }
+  }
+}

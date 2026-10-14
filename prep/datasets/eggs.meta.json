@@ -1,0 +1,37 @@
+{
+  "title": "The evolution of egg shape in birds",
+  "about": [
+    {
+      "name": "Data from: The evolution of egg shape in birds: Evolutionary constraints and adaptations",
+      "quote": "Using accurate measures of size and shape, we studied the eggs of 955 extant species across the avian phylogeny, including 39 of the 40 orders, and 78% of the 249 families.",
+      "url": "https://datadryad.org/dataset/doi:10.5061/dryad.sj3tx9648",
+      "label": "Dryad"
+    },
+    {
+      "name": "AVONET: morphological, ecological and geographical data for all birds",
+      "quote": "The AVONET database contains comprehensive functional trait data for all birds, including six ecological variables, eleven continuous morphological traits, and information on range size and location.",
+      "url": "https://doi.org/10.6084/m9.figshare.16586228",
+      "label": "figshare"
+    }
+  ],
+  "here": "Here: 420 of the 949 species that also appear in AVONET (sampled evenly across orders), as egg elongation, polar asymmetry and pointedness (A) and as hand-wing index, wing length, mass, tarsus and primary lifestyle (B).",
+  "cite": ["eggshape_montgomerie", "eggshape_dryad", "eggshape_biggins", "avonet"],
+  "refs": {
+    "eggshape_montgomerie": {
+      "text": "Montgomerie R, Hemmings N, Thompson JE, Birkhead TR (2021). The shapes of birds’ eggs: evolutionary constraints and adaptations. The American Naturalist 198(6): E215–E231.",
+      "url": "https://doi.org/10.1086/716928"
+    },
+    "eggshape_dryad": {
+      "text": "Montgomerie R, Birkhead T, Thompson J, Hemmings N (2021). Data from: The evolution of egg shape in birds: evolutionary constraints and adaptations. Dryad (CC0).",
+      "url": "https://doi.org/10.5061/dryad.sj3tx9648"
+    },
+    "eggshape_biggins": {
+      "text": "Biggins JD, Thompson JE, Birkhead TR (2018). Accurately quantifying the shape of birds’ eggs. Ecology and Evolution 8(19): 9728–9738.",
+      "url": "https://doi.org/10.1002/ece3.4412"
+    },
+    "avonet": {
+      "text": "Tobias JA, Sheard C, Pigot AL, et al. (2022). AVONET: morphological, ecological and geographical data for all birds. Ecology Letters 25(3): 581–597.",
+      "url": "https://doi.org/10.1111/ele.13898"
+    }
+  }
+}

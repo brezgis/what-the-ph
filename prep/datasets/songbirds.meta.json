@@ -1,0 +1,43 @@
+{
+  "title": "Birds That Don’t Exist",
+  "about": [
+    {
+      "name": "Birds That Don't Exist: Niche Pre-Emption as a Constraint on Morphological Evolution in the Passeroidea",
+      "quote": "We identify a persistent morphological gap densely surrounded by extant species but unoccupied throughout passeroid diversification.",
+      "url": "https://doi.org/10.1111/ele.70320",
+      "label": "Ecology Letters"
+    },
+    {
+      "name": "bird-morphology-tda",
+      "quote": "The project applies persistent homology (topological data analysis) to morphological trait data reconstructed through time to identify and characterize unoccupied regions (\"gaps\") in Passeroidea morphospace.",
+      "url": "https://github.com/stephchia/bird-morphology-tda",
+      "label": "GitHub (Stephanie Chia)"
+    },
+    {
+      "name": "AVONET: morphological, ecological and geographical data for all birds",
+      "quote": "The AVONET database contains comprehensive functional trait data for all birds, including six ecological variables, eleven continuous morphological traits, and information on range size and location.",
+      "url": "https://doi.org/10.6084/m9.figshare.16586228",
+      "label": "figshare"
+    }
+  ],
+  "here": "Here: the 420 of Chia et al.’s 1,378 passeroid species nearest the centre of their focal gap, as the first four principal components of ten AVONET body measurements (A) and as AVONET diet, lifestyle, habitat, migration, range size and latitude (B).",
+  "cite": ["songbirds_chia", "songbirds_zenodo", "avonet", "ebird_clements"],
+  "refs": {
+    "songbirds_chia": {
+      "text": "Chia SY, Swain A, Josephs N, Lin L, Fagan WF (2026). Birds that don’t exist: niche pre-emption as a constraint on morphological evolution in the Passeroidea. Ecology Letters 29(2): e70320.",
+      "url": "https://doi.org/10.1111/ele.70320"
+    },
+    "songbirds_zenodo": {
+      "text": "Chia S (2026). stephchia/bird-morphology-tda: revised code and data archive (v1.1). Zenodo.",
+      "url": "https://doi.org/10.5281/zenodo.18229068"
+    },
+    "avonet": {
+      "text": "Tobias JA, Sheard C, Pigot AL, et al. (2022). AVONET: morphological, ecological and geographical data for all birds. Ecology Letters 25(3): 581–597.",
+      "url": "https://doi.org/10.1111/ele.13898"
+    },
+    "ebird_clements": {
+      "text": "Clements JF, Rasmussen PC, Schulenberg TS, et al. (2025). The eBird/Clements checklist of Birds of the World: v2025. Cornell Lab of Ornithology.",
+      "url": "https://www.birds.cornell.edu/clementschecklist/download/"
+    }
+  }
+}

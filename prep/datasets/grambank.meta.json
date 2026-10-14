@@ -1,0 +1,32 @@
+{
+  "title": "Grambank",
+  "about": [
+    {
+      "name": "Grambank",
+      "quote": "The Grambank database currently covers 2,467 language varieties, capturing a wide range of grammatical phenomena in 195 features, from word order to verbal tense, nominal plurals, and many other well-studied comparative linguistic variables.",
+      "url": "https://grambank.clld.org/",
+      "label": "grambank.clld.org"
+    },
+    {
+      "name": "Glottolog",
+      "quote": "Glottolog provides a comprehensive catalogue of the world's languages, language families and dialects.",
+      "url": "https://glottolog.org/",
+      "label": "glottolog.org"
+    }
+  ],
+  "here": "Here: 300 languages from Grambank v1.0.3, spread over 100+ families (at most 8 per family, 11 for Indo-European so the familiar ones stay in) and each with at least 150 of the 195 features coded, as their position on the globe (A) and as their one-hot-coded grammatical features, unknown ones left blank (B).",
+  "cite": [
+    "grambank",
+    "glottolog"
+  ],
+  "refs": {
+    "grambank": {
+      "text": "Skirgård, Haynie, Blasi, Hammarström, et al. (2023). Grambank reveals the importance of genealogical constraints on linguistic diversity and highlights the impact of language loss. Science Advances 9(16):eadg6175.",
+      "url": "https://doi.org/10.1126/sciadv.adg6175"
+    },
+    "glottolog": {
+      "text": "Hammarström, Forkel, Haspelmath, Bank (2021). Glottolog 4.4. Leipzig: Max Planck Institute for Evolutionary Anthropology.",
+      "url": "https://doi.org/10.5281/zenodo.4761960"
+    }
+  }
+}

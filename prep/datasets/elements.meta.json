@@ -1,0 +1,21 @@
+{
+  "title": "PubChem Periodic Table",
+  "about": [
+    {
+      "name": "PubChem Periodic Table and Element pages",
+      "quote": "Overall, the PubChem Periodic Table and Element pages improve access to chemical element data from authoritative sources.",
+      "url": "https://doi.org/10.1515/cti-2020-0006",
+      "label": "PubChem team, Chemistry Teacher International"
+    }
+  ],
+  "here": "Here: hydrogen to curium (Z 1–96), as seven z-scored properties — electronegativity, atomic radius, ionization energy, electron affinity, and log melting point, boiling point and density (A) — and as row and column on the familiar 18-column table, with the f-block as two rows underneath and Lu under Y (B); blank electron affinities count as 0, He/Ne/Ar/Rn take Allen-scale electronegativities, and the last eight gaps are filled from each element's five nearest neighbours on the rest.",
+  "cite": [
+    "pubchem_ptable"
+  ],
+  "refs": {
+    "pubchem_ptable": {
+      "text": "Kim, S., Gindulyte, A., Zhang, J., Thiessen, P. A., Bolton, E. E. (2020). PubChem Periodic Table and Element pages: improving access to information on chemical elements from authoritative sources. Chemistry Teacher International 3(1), 57–65.",
+      "url": "https://doi.org/10.1515/cti-2020-0006"
+    }
+  }
+}

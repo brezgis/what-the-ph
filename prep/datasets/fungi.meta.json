@@ -1,0 +1,19 @@
+{
+  "title": "UNITE general FASTA release for Fungi",
+  "about": [
+    {"name": "UNITE general FASTA release for Fungi (v10.0, 2025-02-19)",
+     "quote": "This release consists of a single FASTA file: the RepS/RefS of all SHs, adopting the dynamic use of gap values whenever available.",
+     "url": "https://unite.ut.ee/repository.php", "label": "UNITE Community"},
+    {"name": "nucleotide-transformer-v2-50m-multi-species",
+     "quote": "Part of this collection is the nucleotide-transformer-v2-50m-multi-species, a 50M parameters transformer pre-trained on a collection of 850 genomes from a wide range of species, including model and non-model organisms.",
+     "url": "https://huggingface.co/InstaDeepAI/nucleotide-transformer-v2-50m-multi-species", "label": "InstaDeep model card (CC BY-NC-SA 4.0)"}
+  ],
+  "here": "Here: 247 hand-picked well-known species, one UNITE ITS reference sequence each, as 4-letter DNA word frequencies (A) and as the Nucleotide Transformer v2 (50M) last-layer states averaged over the sequence (B).",
+  "cite": ["unite", "nt"],
+  "refs": {
+    "unite": {"text": "Abarenkov K, Zirk A, Piirmann T, Pöhönen R, Ivanov F, Nilsson RH, Kõljalg U (2025). UNITE general FASTA release for Fungi. Version 19.02.2025. UNITE Community.",
+              "url": "https://doi.org/10.15156/BIO/3301229"},
+    "nt": {"text": "Dalla-Torre H, Gonzalez L, Mendoza-Revilla J, et al. (2025). Nucleotide Transformer: building and evaluating robust foundation models for human genomics. Nature Methods 22:287–297.",
+           "url": "https://doi.org/10.1038/s41592-024-02523-z"}
+  }
+}

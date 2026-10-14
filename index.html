@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What the PH?!</title>
+  <meta name="description" content="One real point cloud, two views, many lenses: Procrustes, RSA, CKA, persistent homology and intrinsic dimension.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..500;1,6..72,300..400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%231f2c78'%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='22' cy='8' r='3'/%3E%3Ccircle cx='24' cy='22' r='3'/%3E%3Ccircle cx='10' cy='24' r='3'/%3E%3C/g%3E%3Cpath d='M9 11L22 8L24 22L10 24Z' fill='none' stroke='%231f2c78' stroke-width='1.2'/%3E%3C/svg%3E">
+</head>
+<body>
+  <canvas id="stage"></canvas>
+
+  <!-- the controls read as one sentence -->
+  <header class="top">
+    <a class="mark" href="#">What the PH?!</a>
+    <p class="sentence" id="sentence" aria-label="what to show"></p>
+    <div class="tools" id="tools"></div>
+  </header>
+
+  <!-- what the picture means, set like a figure caption -->
+  <figure class="caption" id="caption">
+    <button class="cap-toggle" id="cap-toggle" aria-expanded="true">hide</button>
+    <div class="cap-row">
+      <div class="eq" id="lens-eq"></div>
+      <div class="cap-mid">
+        <p class="cap-title" id="cap-title"></p>
+        <p class="legend" id="lens-legend"></p>
+      </div>
+      <div class="cap-out">
+        <div class="readout" id="readout"></div>
+        <div id="lens-controls"></div>
+      </div>
+    </div>
+    <details class="more" id="sources">
+      <summary>distance &amp; references</summary>
+      <div class="more-body">
+        <div>
+          <div class="eq eq-small" id="metric-eq"></div>
+          <p class="metric-note" id="metric-note"></p>
+        </div>
+        <div id="refs"></div>
+      </div>
+    </details>
+  </figure>
+
+  <div class="pop" id="pop" hidden role="listbox"></div>
+  <div class="tip" id="tip" hidden><b></b><span></span></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/refs.js"></script>
+  <script src="js/lenses.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

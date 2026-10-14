@@ -1,0 +1,29 @@
+{
+  "title": "GeoNames cities × NASA POWER climate",
+  "about": [
+    {
+      "name": "GeoNames",
+      "quote": "The GeoNames geographical database covers all countries and contains over eleven million placenames that are available for download free of charge.",
+      "url": "https://www.geonames.org/",
+      "label": "geonames.org"
+    },
+    {
+      "name": "NASA Prediction Of Worldwide Energy Resources (POWER)",
+      "quote": "NASA POWER provides solar and meteorological data from satellite observations and models to help worldwide users respond to challenges and societal needs.",
+      "url": "https://power.larc.nasa.gov/",
+      "label": "NASA Langley"
+    }
+  ],
+  "here": "Here: 300 cities from GeoNames cities15000 (the most populous, a few per country, plus capitals and far-flung islands and polar towns), as their position on the globe (A) and as NASA POWER’s 2001–2025 monthly climate at that spot: 12 mean temperatures in °C and 12 rainfalls as log(1 + mm/day), each of the 24 columns rescaled to mean 0 and spread 1 (B).",
+  "cite": ["geonames", "nasa_power"],
+  "refs": {
+    "geonames": {
+      "text": "GeoNames (2026). cities15000: all cities with a population > 15000 or capitals. geonames.org. CC BY 4.0.",
+      "url": "https://download.geonames.org/export/dump/"
+    },
+    "nasa_power": {
+      "text": "NASA Langley Research Center (2026). Prediction Of Worldwide Energy Resources (POWER) Climatology API v2.10.1, MERRA-2 monthly climatology 2001–2025, accessed 2026-10-14. Funded through the NASA Earth Science Division.",
+      "url": "https://power.larc.nasa.gov/"
+    }
+  }
+}

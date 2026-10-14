@@ -1,0 +1,39 @@
+{
+  "title": "PokéAPI: Pokémon Gen I–III",
+  "about": [
+    {
+      "name": "PokéAPI",
+      "quote": "All the Pokémon data you'll ever need in one place, easily accessible through a modern free open-source RESTful API.",
+      "url": "https://pokeapi.co/",
+      "label": "pokeapi.co"
+    },
+    {
+      "name": "PokéAPI Sprites",
+      "quote": "To save load on PokéAPI, we host all the sprite images here.",
+      "url": "https://github.com/PokeAPI/sprites",
+      "label": "PokéAPI (GitHub)"
+    },
+    {
+      "name": "DINOv2",
+      "quote": "DINOv2 models produce high-performance visual features that can be directly employed with classifiers as simple as linear layers on a variety of computer vision tasks",
+      "url": "https://github.com/facebookresearch/dinov2",
+      "label": "Meta FAIR"
+    }
+  ],
+  "here": "Here: all 386 Pokémon of Generations I–III (Bulbasaur to Deoxys, default forms, today's base stats and types), as their six base stats z-scored (A) and as DINOv2 embeddings of the classic front sprite, cropped and set on white (B); colours mark the primary type.",
+  "cite": ["pokeapi", "pokeapi_sprites", "dinov2"],
+  "refs": {
+    "pokeapi": {
+      "text": "Hallett, P. and PokéAPI contributors (2014). PokéAPI: data/v2/csv. GitHub. Pokémon and Pokémon character names are trademarks of Nintendo.",
+      "url": "https://github.com/PokeAPI/pokeapi/tree/master/data/v2/csv"
+    },
+    "pokeapi_sprites": {
+      "text": "PokéAPI contributors (2016). PokéAPI Sprites. GitHub. Images © The Pokémon Company.",
+      "url": "https://github.com/PokeAPI/sprites"
+    },
+    "dinov2": {
+      "text": "Oquab, Darcet, Moutakanni, et al. (2024). DINOv2: Learning Robust Visual Features without Supervision. TMLR.",
+      "url": "https://openreview.net/forum?id=a68SUt6zFt"
+    }
+  }
+}

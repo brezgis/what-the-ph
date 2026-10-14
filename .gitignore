@@ -1,0 +1,9 @@
+# raw downloads and the Python env are rebuilt locally
+prep/raw/
+prep/.venv/
+__pycache__/
+*.pyc
+# local experiments, not part of the site
+alts/
+review/
+.DS_Store

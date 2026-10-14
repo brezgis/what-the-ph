@@ -1,0 +1,14 @@
+{
+  "title": "Single-cell temporal transcriptomics of the human cell cycle",
+  "about": [
+    {"name": "GEO GSE146773: Single-cell temporal transcriptomics of the human cell cycle",
+     "quote": "A total of 1,152 single U2OS FUCCI cells were sorted by FACS, and RNA-Seq was collected for each cell using SMART-seq2 chemistry.",
+     "url": "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE146773", "label": "NCBI GEO"}
+  ],
+  "here": "Here: 400 of the cells, picked evenly along the authors’ FUCCI pseudotime, as their two log reporter intensities (A) and as the first 5 principal components of the 500 most variable genes (B).",
+  "cite": ["mahdessian2021"],
+  "refs": {
+    "mahdessian2021": {"text": "Mahdessian D, Cesnik AJ, Gnann C, et al. (2021). Spatiotemporal dissection of the cell cycle with single-cell proteogenomics. Nature 590:649–654.",
+                       "url": "https://doi.org/10.1038/s41586-021-03232-9"}
+  }
+}
