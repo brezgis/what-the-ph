@@ -9,6 +9,8 @@ the question you're asking.
 
 Not rigorous. All real data.
 
+**Live: https://point.brezgis.com**
+
 ![Stars on the sky: a sphere, and its H₂ void in the barcode](docs/screenshots/stars-void.png)
 
 | | |
