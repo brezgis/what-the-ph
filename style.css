@@ -9,24 +9,6 @@
   --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #0d1230;
-    --ink: #c3cdff;
-    --ink-2: rgba(195, 205, 255, .82);
-    --ink-3: rgba(195, 205, 255, .48);
-    --hair: rgba(195, 205, 255, .18);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --paper: #0d1230;
-  --ink: #c3cdff;
-  --ink-2: rgba(195, 205, 255, .82);
-  --ink-3: rgba(195, 205, 255, .48);
-  --hair: rgba(195, 205, 255, .18);
-  color-scheme: dark;
-}
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }

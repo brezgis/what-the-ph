@@ -66,13 +66,6 @@
       this.bindPointer();
       window.addEventListener('resize', () => this.resize());
       if (document.fonts) document.fonts.ready.then(() => this.resize());
-      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        this.readColors();
-        this.matImgs = null;
-        this.tipURLs = [];
-        this.dirty = true;
-        this.loadSprites();
-      });
       this.last = performance.now();
       requestAnimationFrame(t => this.frame(t));
     }
