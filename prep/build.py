@@ -17,6 +17,7 @@ A dataset module (datasets/<id>.py) exposes `load()` returning a dict:
     notes  (optional)       {step key: html} extra asides for particular steps
     cite   (optional)       keys into js/refs.js for the data and models used
     reading (optional)      {step key: [ref keys]} papers about this data + lens
+    metrics (optional)      distance keys to offer, when only some mean anything here
     views                   two dicts: {name, X (n×d array), metric}  (metric = its natural distance)
     layers (optional)       {names: [...], Xs: [arrays]} for the CKA heatmap
 
@@ -42,7 +43,7 @@ HERE = Path(__file__).parent
 OUT = HERE.parent / 'data'
 K = 5  # neighbors for the overlap lens
 
-DATASETS = ['layers', 'clock', 'numbers', 'clocks', 'grambank',
+DATASETS = ['layers', 'clock', 'numbers', 'clocks', 'grambank', 'states',
             'turntable', 'doodles', 'mnist', 'emoji', 'pokemon',
             'stars', 'cities', 'elements', 'songbirds', 'eggs', 'orbits', 'fungi', 'cellcycle',
             'candy', 'bobross']
@@ -255,6 +256,9 @@ def build(ds_id):
     n = len(spec['labels'])
     views = spec['views']
     opts, default = metric_options(views)
+    if spec.get('metrics'):   # a dataset can say only some distances mean anything for it
+        opts = [o for o in opts if o[0] in spec['metrics']]
+        default = default if default in spec['metrics'] else opts[0][0]
 
     base = {
         'id': ds_id,

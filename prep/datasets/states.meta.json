@@ -1,0 +1,33 @@
+{
+  "title": "Shapes of states",
+  "about": [
+    {
+      "name": "Second-order isomorphism of internal representations: Shapes of states",
+      "quote": "In support of this “second-order” type of isomorphism, subjective judgments of the similarities among the shapes of 15 states of the U. S. are found (a) to be very much the same whether the states to be compared are pictorially displayed or only imagined, and (b) to be related, in both cases to identifiable properties of their actual cartographic shapes.",
+      "url": "https://doi.org/10.1016/0010-0285(70)90002-2",
+      "label": "Cognitive Psychology"
+    },
+    {
+      "name": "Cartographic Boundary Files",
+      "quote": "The cartographic boundary files are simplified representations of select geographic areas from the Census Bureau’s Master Address File/Topologically Integrated Geographic Encoding and Referencing (MAF/TIGER) System. These boundary files are specifically designed for small scale thematic mapping.",
+      "url": "https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html",
+      "label": "U.S. Census Bureau"
+    }
+  ],
+  "here": "Here: the two 2-D MDS solutions of Fig. 1, from seven people’s average rankings of all 105 pairs, digitized from the printed figure: imagined from the state’s name (A) and seen as an outline drawing (B). The paper doesn’t print the rankings themselves. Silhouettes are from the Census Bureau’s 2023 1:5,000,000 state boundaries.",
+  "cite": ["shepard_chipman", "census_cb"],
+  "refs": {
+    "shepard_chipman": {
+      "text": "Shepard RN, Chipman S (1970). Second-order isomorphism of internal representations: Shapes of states. Cognitive Psychology 1(1): 1–17.",
+      "url": "https://doi.org/10.1016/0010-0285(70)90002-2"
+    },
+    "cliff_rotation": {
+      "text": "Cliff N (1966). Orthogonal rotation to congruence. Psychometrika 31(1): 33–42.",
+      "url": "https://doi.org/10.1007/BF02289455"
+    },
+    "census_cb": {
+      "text": "U.S. Census Bureau (2024). 2023 Cartographic Boundary Files: States, 1:5,000,000 (cb_2023_us_state_5m).",
+      "url": "https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html"
+    }
+  }
+}

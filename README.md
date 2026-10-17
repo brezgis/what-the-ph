@@ -19,6 +19,7 @@ Not rigorous. All real data.
 | ![Pokémon Gen I–III by how they look](docs/screenshots/pokemon.png) | ![Bob Ross paintings](docs/screenshots/bob-ross.png) |
 | ![Cities: globe vs climate, nearest neighbours](docs/screenshots/cities.png) | ![Numbers 0–99 in Llama vs Qwen: RSA](docs/screenshots/numbers-rsa.png) |
 | ![Songbird morphospace and its barcode](docs/screenshots/songbirds.png) | ![Quick, Draw! doodles](docs/screenshots/doodles.png) |
+| ![Shapes of states, placed by how alike people judged their outlines (Shepard & Chipman 1970)](docs/screenshots/states.png) | |
 
 ## Run it
 
@@ -43,6 +44,7 @@ shift-drag to pan, double-click to reset, ← → to step through analyses,
 | Numbers 0–99 | 100 | Llama-3.2-1B · Qwen2.5-0.5B |
 | Clock faces | 144 times | rendered clock pixels · Llama-3.2-1B reading "3:15" |
 | Grambank | 300 languages | where it's spoken (a sphere) · grammar |
+| Shapes of states | 15 U.S. states | imagined from the name · seen as an outline (Shepard & Chipman 1970) |
 | COIL-20 | 5 objects × 36 angles | pixels · DINOv2 |
 | The Quick, Draw! Dataset | 240 doodles | pixels · DINOv2 |
 | MNIST | 300 digits | pixels · DINOv2 |
@@ -99,6 +101,10 @@ creators and keeps its own terms; this is a free, non-commercial, educational to
   non-commercial, share-alike.
 - **Single-cell cell-cycle data** — GEO GSE146773 (Mahdessian et al. 2021).
 - **PubChem** periodic table — public domain.
+- **Shapes of states** — the two 2-D solutions digitized from Fig. 1 of Shepard &
+  Chipman (1970), *Cognitive Psychology* 1:1–17 (the paper doesn't print the
+  rankings themselves); state silhouettes from the U.S. Census Bureau's
+  cartographic boundary files, public domain.
 - **PokéAPI** data (BSD-3) and sprites. Pokémon and their sprites are © Nintendo,
   Creatures Inc. and GAME FREAK inc. / The Pokémon Company, used here
   non-commercially.
