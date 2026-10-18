@@ -1,0 +1,33 @@
+{
+  "title": "Ekman’s colours",
+  "about": [
+    {
+      "name": "Ekman data set (smacof)",
+      "quote": "Ekman presents similarities for 14 colors which are based on a rating by 31 subjects where each pair of colors was rated on a 5-point scale (0 = no similarity up to 4 = identical). After averaging, the similarities were divided by 4 such that they are within the unit interval. Similarities of colors with wavelengths from 434 to 674 nm.",
+      "url": "https://search.r-project.org/CRAN/refmans/smacof/html/ekman.html",
+      "label": "CRAN: smacof"
+    },
+    {
+      "name": "CIE 1931 colour-matching functions, 2 degree observer",
+      "quote": "CIE 1931 colour-matching functions (x_bar, y_bar, z_bar), 2 degree observer, 1 nm wavelength steps, original source: CIE 018:2019, Table 6",
+      "url": "https://doi.org/10.25039/CIE.DS.xvudnb9b",
+      "label": "CIE"
+    }
+  ],
+  "here": "Here: all 14 colours, as 1 − Ekman’s averaged similarity ratings (A) and as each wavelength’s CIE 1976 u′v′ chromaticity, computed from the CIE 1931 colour-matching functions (B).",
+  "cite": ["ekman", "shepard_1962", "cie_1931"],
+  "refs": {
+    "ekman": {
+      "text": "Ekman G (1954). Dimensions of color vision. The Journal of Psychology 38(2): 467–474.",
+      "url": "https://doi.org/10.1080/00223980.1954.9712953"
+    },
+    "shepard_1962": {
+      "text": "Shepard RN (1962). The analysis of proximities: Multidimensional scaling with an unknown distance function. II. Psychometrika 27(3): 219–246.",
+      "url": "https://doi.org/10.1007/BF02289621"
+    },
+    "cie_1931": {
+      "text": "CIE (2019). Colour-matching functions of CIE 1931 standard colorimetric observer. International Commission on Illumination, Vienna. CC BY-SA 4.0.",
+      "url": "https://doi.org/10.25039/CIE.DS.xvudnb9b"
+    }
+  }
+}

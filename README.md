@@ -45,6 +45,9 @@ shift-drag to pan, double-click to reset, ← → to step through analyses,
 | Clock faces | 144 times | rendered clock pixels · Llama-3.2-1B reading "3:15" |
 | Grambank | 300 languages | where it's spoken (a sphere) · grammar |
 | Shapes of states | 15 U.S. states | imagined from the name · seen as an outline (Shepard & Chipman 1970) |
+| Ekman's colours | 14 spectral colours | how alike people rated them · CIE 1976 chromaticity |
+| Man and monkey IT | 92 images | human IT (fMRI) · monkey IT (674 neurons) |
+| percept2vec animals | 120 photos | people's similarity ratings · DINOv2 |
 | COIL-20 | 5 objects × 36 angles | pixels · DINOv2 |
 | The Quick, Draw! Dataset | 240 doodles | pixels · DINOv2 |
 | MNIST | 300 digits | pixels · DINOv2 |
@@ -72,7 +75,8 @@ lists the papers behind it under "distance & references".
   (H₂ too, for the spheres), k-NN lists, TwoNN, Procrustes with a shuffled-chance
   baseline, RSA. The browser never computes geometry; it only animates.
 - `prep/datasets/<id>.py` — one module per dataset (`load()` returns two views of
-  the same items), with `<id>.meta.json` holding official names and quotes.
+  the same items, as feature vectors or as a published distance matrix), with
+  `<id>.meta.json` holding official names and quotes.
 - `js/scene.js` — the single canvas renderer; `js/main.js` — the sentence pickers,
   caption and routing; `js/lenses.js` — each analysis as an equation, a legend
   and a readout; `js/refs.js` — the citations.
@@ -91,6 +95,8 @@ The **code** is MIT-licensed (see `LICENSE`). The **data** belongs to its
 creators and keeps its own terms; this is a free, non-commercial, educational toy.
 
 - **HYG star database** — CC BY-SA 4.0 (so `data/stars*` is CC BY-SA 4.0 too).
+- **CIE 1931 colour-matching functions** — CC BY-SA 4.0 (so `data/colors*` is too).
+  Ekman's (1954) colour similarities, as distributed in the R package smacof.
 - **GeoNames** — CC BY 4.0. **NASA POWER** climatology (MERRA-2), courtesy of the
   NASA POWER project.
 - **Grambank** (Skirgård et al. 2023) and **Glottolog** — CC BY 4.0.
@@ -105,6 +111,13 @@ creators and keeps its own terms; this is a free, non-commercial, educational to
   Chipman (1970), *Cognitive Psychology* 1:1–17 (the paper doesn't print the
   rankings themselves); state silhouettes from the U.S. Census Bureau's
   cartographic boundary files, public domain.
+- **Kriegeskorte et al. (2008)** and **Kiani et al. (2007)** — the 92-image human- and
+  monkey-IT dissimilarity matrices and stimuli, via the RSA toolbox's demo data
+  (rsagroup/rsatoolbox, MIT); images used non-commercially.
+- **Peterson, Abbott & Griffiths** animal photos and similarity ratings (CogSci 2016;
+  *Cognitive Science* 2018), from jcpeterson/percept2vec. Per the repo the photos were
+  scraped from Google and aren't owned by its author; shown here as small thumbnails,
+  non-commercially.
 - **PokéAPI** data (BSD-3) and sprites. Pokémon and their sprites are © Nintendo,
   Creatures Inc. and GAME FREAK inc. / The Pokémon Company, used here
   non-commercially.

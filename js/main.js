@@ -129,8 +129,8 @@
     const two = cur.view === 'ab';
     const A = ds.views[0].name, B = ds.views[1].name;
     const viewItems = [
-      { key: 'a', label: A, hint: `${ds.views[0].dims}-D, one cloud` },
-      { key: 'b', label: B, hint: `${ds.views[1].dims}-D, one cloud` },
+      { key: 'a', label: A, hint: `${dimText(ds.views[0])}, one cloud` },
+      { key: 'b', label: B, hint: `${dimText(ds.views[1])}, one cloud` },
       { key: 'ab', label: `${A} vs ${B}`, hint: 'two clouds, side by side' },
     ];
     s.append(
@@ -214,7 +214,8 @@
     $('lens-legend').innerHTML = L.legend;
     const vs = ds.vsEuclid || [1, 1];
     const which = mode === 'two' ? [0, 1] : [v];
-    $('metric-note').innerHTML = METRICS[cur.metric].note + (cur.metric === 'euclidean' ? '' :
+    $('metric-note').innerHTML = METRICS[cur.metric].note + (ds.metricNote ? ` ${ds.metricNote}` : '') +
+      (cur.metric === 'euclidean' || cur.metric === 'given' ? '' :
       ` <span class="agree">Rank agreement with Euclidean: ${which.map(i =>
         `${mode === 'two' ? ds.views[i].name + ' ' : ''}<b>${vs[i].toFixed(2)}</b>`).join(', ')}${
         Math.min(...which.map(i => vs[i])) > 0.97 ? ' (here it barely matters)' : ''}.</span>`);

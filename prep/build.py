@@ -18,7 +18,10 @@ A dataset module (datasets/<id>.py) exposes `load()` returning a dict:
     cite   (optional)       keys into js/refs.js for the data and models used
     reading (optional)      {step key: [ref keys]} papers about this data + lens
     metrics (optional)      distance keys to offer, when only some mean anything here
-    views                   two dicts: {name, X (n×d array), metric}  (metric = its natural distance)
+    views                   two dicts: {name, X (n×d array), metric}  (metric = its natural distance),
+                            or {name, D (n×n dissimilarities as published)}: a judged or measured
+                            distance matrix with no features behind it
+    metric_note (optional)  html: what 'their own' distance is for each view, when a view has D
     layers (optional)       {names: [...], Xs: [arrays]} for the CKA heatmap
 
 The page never computes geometry itself; it only animates what is in here.
@@ -43,7 +46,7 @@ HERE = Path(__file__).parent
 OUT = HERE.parent / 'data'
 K = 5  # neighbors for the overlap lens
 
-DATASETS = ['layers', 'clock', 'numbers', 'clocks', 'grambank', 'states',
+DATASETS = ['layers', 'clock', 'numbers', 'clocks', 'grambank', 'states', 'colors', 'cortex', 'peterson',
             'turntable', 'doodles', 'mnist', 'emoji', 'pokemon',
             'stars', 'cities', 'elements', 'songbirds', 'eggs', 'orbits', 'fungi', 'cellcycle',
             'candy', 'bobross']
@@ -53,6 +56,11 @@ GEO_K = 10  # neighbors in the graph that geodesic distance walks along
 
 
 def raw_distances(X, metric):
+    if metric == 'given':           # a view that arrived as a distance matrix
+        D = np.asarray(X, dtype=float)
+        D = (D + D.T) / 2
+        np.fill_diagonal(D, 0)
+        return D
     X = np.asarray(X, dtype=float)
     if metric == 'standardized':
         sd = X.std(0)
@@ -130,6 +138,37 @@ def linear_cka(X, Y):
     return float(xy / (np.linalg.norm(X.T @ X) * np.linalg.norm(Y.T @ Y)))
 
 
+def gram(v):
+    """Centred Gram matrix of a view: X Xᵀ for features, −½ J D∘² J for a distance
+    matrix (the inner products classical MDS would give it)."""
+    if 'D' in v:
+        D = raw_distances(v['D'], 'given')
+        D = D / D.max()
+        n = len(D)
+        J = np.eye(n) - 1 / n
+        return -0.5 * J @ (D ** 2) @ J
+    X = np.asarray(v['X'], float)
+    X = X - X.mean(0)
+    return X @ X.T
+
+
+def gram_cka(K, L):
+    """Linear CKA from centred Gram matrices; equals linear_cka on features."""
+    return float((K * L).sum() / (np.linalg.norm(K) * np.linalg.norm(L)))
+
+
+def cka_pair(views, n):
+    if not any('D' in v for v in views):
+        X, Y = views[0]['X'], views[1]['X']
+        return (linear_cka(X, Y),
+                float(np.mean([linear_cka(X, Y[np.random.default_rng(s).permutation(n)]) for s in range(20)])))
+    K, L = gram(views[0]), gram(views[1])
+    def shuffled(s):
+        p = np.random.default_rng(s).permutation(n)
+        return gram_cka(K, L[np.ix_(p, p)])
+    return gram_cka(K, L), float(np.mean([shuffled(s) for s in range(20)]))
+
+
 def knn(D, k):
     D = D.copy()
     np.fill_diagonal(D, np.inf)
@@ -183,7 +222,11 @@ def is_binary(X):
 
 def metric_options(views):
     """Which distances make sense here. One metric always applies to both views,
-    so comparisons are like with like. Default: the first view's own metric."""
+    so comparisons are like with like. Default: the first view's own metric.
+    A view that is already a distance matrix can't be re-measured, so then the one
+    option is 'given': each view keeps its own (feature views their natural metric)."""
+    if any('D' in v for v in views):
+        return [('given', ['given' if 'D' in v else v['metric'] for v in views])], 'given'
     binary = [is_binary(v['X']) for v in views]
     opts = []
     for m in ('euclidean', 'cosine', 'cityblock', 'chebyshev', 'correlation', 'standardized', 'geodesic', 'jaccard'):
@@ -199,15 +242,19 @@ def metric_options(views):
     return opts, default
 
 
+def src(v):
+    return v['D'] if 'D' in v else v['X']
+
+
 def geometry(views, metrics, maxdim=1):
     """Everything that depends on the choice of distance."""
-    n = len(views[0]['X'])
-    Ds = [distances(v['X'], m) for v, m in zip(views, metrics)]
+    n = len(src(views[0]))
+    Ds = [distances(src(v), m) for v, m in zip(views, metrics)]
     Ys = [classical_mds(D) for D in Ds]
     # a flat (2-D) Euclidean view is already a picture: show it as itself, z = 0,
     # so a periodic table looks like a periodic table (distances are unchanged)
     for i, (v, m) in enumerate(zip(views, metrics)):
-        if v['X'].shape[1] == 2 and m == 'euclidean':
+        if 'X' in v and v['X'].shape[1] == 2 and m == 'euclidean':
             P = np.asarray(v['X'], float) - np.asarray(v['X'], float).mean(0)
             P = P / np.abs(P).max()
             Ys[i] = np.column_stack([P, np.zeros(len(P))])
@@ -223,7 +270,8 @@ def geometry(views, metrics, maxdim=1):
     iu = np.triu_indices(n, 1)
     nn = [knn(D, K) for D in Ds]
     # does the choice of distance matter? rank agreement with plain Euclidean, per view
-    vs = [float(spearmanr(D[iu], distances(v['X'], 'euclidean')[iu]).statistic) for v, D in zip(views, Ds)]
+    vs = [1.0 if 'D' in v else float(spearmanr(D[iu], distances(v['X'], 'euclidean')[iu]).statistic)
+          for v, D in zip(views, Ds)]
     out = {
         'vsEuclid': [round(x, 3) for x in vs],
         'procrustes': {'a': r(A3), 'b': r(B3), 'disparity': round(disparity, 4), 'chance': round(chance, 4), 'dims': kk},
@@ -234,7 +282,7 @@ def geometry(views, metrics, maxdim=1):
         'views': [],
     }
     for v, m, D, Y, nb in zip(views, metrics, Ds, Ys, nn):
-        idim, kept_pts, unique, mu = two_nn(D, v['X'].shape[1])
+        idim, kept_pts, unique, mu = two_nn(D, v['X'].shape[1] if 'X' in v else None)
         _, spread = classical_mds(D, 3, kept=True)
         out['views'].append({
             'metric': m,
@@ -276,12 +324,12 @@ def build(ds_id):
         'glyphs': spec.get('glyphs'),
         'cite': spec.get('cite'),        # keys into js/refs.js
         'reading': spec.get('reading'),  # {lens key: [ref keys]} dataset-specific papers
-        'views': [{'name': v['name'], 'dims': int(v['X'].shape[1])} for v in views],
-        # CKA works on the raw features, so it doesn't depend on the distance
-        'cka': round(linear_cka(views[0]['X'], views[1]['X']), 4),
-        # chance level: CKA after shuffling which row of B goes with which row of A
-        'ckaChance': round(float(np.mean([linear_cka(views[0]['X'], views[1]['X'][np.random.default_rng(s).permutation(n)])
-                                          for s in range(20)])), 4),
+        # dims None = the view is a distance matrix, not features
+        'views': [{'name': v['name'], 'dims': int(v['X'].shape[1]) if 'X' in v else None} for v in views],
+        # CKA works on the raw features (or the Gram matrix of a given distance matrix),
+        # so it doesn't depend on the distance; chance = after shuffling who is who in B
+        **dict(zip(('cka', 'ckaChance'), (round(c, 4) for c in cka_pair(views, n)))),
+        'metricNote': spec.get('metric_note'),
         'metrics': [{'key': k, 'views': ms} for k, ms in opts],
         'h2': bool(spec.get('h2')),
         'defaultMetric': default,

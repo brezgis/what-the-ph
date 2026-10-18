@@ -26,6 +26,9 @@
   const both = { split: 1, showA: 1, showB: 1 };
   // where the lens shows one cloud or two
   const frame = (mode, v) => (mode === 'two' ? Object.assign({}, both) : solo(v));
+  // "66-D", or what a view is when it has no coordinates of its own
+  const dimText = x => (x.dims ? `${x.dims}-D` : 'a distance matrix');
+  window.dimText = dimText;
   const perView = (ds, fn) => ds.views.map((x, i) => stat(x.name, fn(x, i))).join('');
 
   const METRICS = {
@@ -64,6 +67,11 @@
       tex: String.raw`d_G(x,y) = \min_{x = p_0, \ldots, p_m = y} \; \textstyle\sum_t \lVert p_t - p_{t+1} \rVert`,
       note: 'Shortest path that steps between near neighbors (a 10-NN graph, plus the shortest bridge between any separate islands): an ant on the surface, not a crow.',
     },
+    given: {
+      label: 'their own',
+      tex: String.raw`d(i,j) = D_{ij} \;\; \text{as measured}`,
+      note: 'At least one view arrived as a distance matrix (judged or measured), so it can’t be re-measured: each view keeps the distance it came with.',
+    },
     jaccard: {
       label: 'Jaccard',
       tex: String.raw`d(x,y) = 1 - \frac{|\,x \wedge y\,|}{|\,x \vee y\,|}`,
@@ -82,8 +90,8 @@
       readout: (ds, mode, v) => {
         const kept = x => `${Math.round((x.mdsKept || 0) * 100)}%`;
         return mode === 'two'
-          ? ds.views.map(x => stat(x.name, kept(x), `of the spread, in 3-D (from ${x.dims}-D)`)).join('')
-          : stat('3-D keeps', kept(ds.views[v]), `of the spread (from ${ds.views[v].dims}-D)`);
+          ? ds.views.map(x => stat(x.name, kept(x), `of the spread, in 3-D (from ${dimText(x)})`)).join('')
+          : stat('3-D keeps', kept(ds.views[v]), `of the spread (from ${dimText(ds.views[v])})`);
       },
       reading: ['mds'],
     },
@@ -157,7 +165,7 @@
       label: 'RSA',
       modes: ['two'],
       tex: String.raw`\rho = \operatorname{Spearman}\!\big( [D^{A}_{ij}]_{i<j},\; [D^{B}_{ij}]_{i<j} \big)`,
-      legend: 'Top: each representation’s distance matrix, same item order, stronger ink = closer. Below: a sample of item pairs, one dot each.',
+      legend: 'Top: each representation’s distance matrix as percentiles, same item order, stronger ink = closer. Below: a sample of item pairs by distance rank, one dot each.',
       // the matrices are the picture here: items become plain dots on the diagonal
       scene: () => ({ split: 1, showB: 1, mat: 1, fig: 1, scatter: 1, pics: 0 }),
       readout: ds => stat('ρ', f2(ds.rsa), agreement(ds.rsa)),

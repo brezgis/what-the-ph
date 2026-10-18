@@ -175,10 +175,20 @@
       }));
       this.rank = new Int32Array(n);
       ds.order.forEach((item, r) => (this.rank[item] = r));
+      // each pair's distance as a percentile of its view (ties share their mean rank):
+      // RSA is Spearman, so the matrices and scatter show what it sees, as
+      // Kriegeskorte et al. show RDMs. Raw ‰ can crowd into a corner otherwise.
+      this.pct = ds.views.map(v => {
+        const cnt = new Uint32Array(1001), below = new Float64Array(1001), P = new Float32Array(m);
+        for (let k = 0; k < m; k++) cnt[v.dist[k]]++;
+        for (let t = 1; t <= 1000; t++) below[t] = below[t - 1] + cnt[t - 1];
+        for (let k = 0; k < m; k++) P[k] = m > 1 ? (below[v.dist[k]] + (cnt[v.dist[k]] - 1) / 2) / (m - 1) : 0;
+        return P;
+      });
       // scatter sample for RSA
       const step = Math.max(1, Math.floor(m / 3500));
       this.pairs = [];
-      for (let k = 0; k < m; k += step) this.pairs.push([ds.views[0].dist[k] / 1000, ds.views[1].dist[k] / 1000]);
+      for (let k = 0; k < m; k += step) this.pairs.push([this.pct[0][k], this.pct[1][k]]);
       // how far the ε sweep should go: past the last loop, and past most merges,
       // but not all the way to "everything touches everything"
       let top = 0;
@@ -796,7 +806,7 @@
       ctx.textBaseline = 'alphabetic';
       for (let v = 0; v < 2; v++) {
         const V = this.ds.views[v];
-        const full = `${v ? 'B' : 'A'}  ·  ${V.name.toUpperCase()}  ·  ${V.dims}-D`;
+        const full = `${v ? 'B' : 'A'}  ·  ${V.name.toUpperCase()}  ·  ${V.dims ? V.dims + '-D' : 'RDM'}`;
         ctx.fillText(ctx.measureText(full).width < L.R0 * 2.2 ? full : V.name.toUpperCase(), L.cx0[v], L.cy0 - L.R0 - 26);
       }
       ctx.textAlign = 'left';
@@ -917,14 +927,14 @@
       if (this.matImgs) return this.matImgs;
       const n = this.n, ord = this.ds.order;
       const ink = this.inkRGB();
-      this.matImgs = this.ds.views.map(V => {
+      this.matImgs = this.ds.views.map((V, v) => {
         const cv = document.createElement('canvas');
         cv.width = cv.height = n;
         const g = cv.getContext('2d'), im = g.createImageData(n, n);
         const cond = (i, j) => {
           if (i === j) return 0;
           if (i > j) [i, j] = [j, i];
-          return V.dist[n * i - (i * (i + 1)) / 2 + (j - i - 1)] / 1000;
+          return this.pct[v][n * i - (i * (i + 1)) / 2 + (j - i - 1)];
         };
         for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
           const d = cond(ord[r], ord[c]), o = (r * n + c) * 4;
@@ -992,7 +1002,7 @@
 
     drawScatter(F, a) {
       const B = this.figBox(F, 1.6), ctx = this.ctx;
-      this.axes(B, `distance in ${this.ds.views[0].name}`, `distance in ${this.ds.views[1].name}`, a);
+      this.axes(B, `distance rank in ${this.ds.views[0].name}`, `distance rank in ${this.ds.views[1].name}`, a);
       ctx.globalAlpha = a * (this.pairs.length > 1500 ? 0.35 : 0.7);
       for (const [x, y] of this.pairs) ctx.fillRect(B.x + x * B.w - 1.5, B.y + (1 - y) * B.h - 1.5, 3, 3);
     }

@@ -1,0 +1,33 @@
+{
+  "title": "percept2vec: animals",
+  "about": [
+    {
+      "name": "percept2vec",
+      "quote": "Datasets and API (coming soon) for fitting CNN representations to human similarity judgments for images",
+      "url": "https://github.com/jcpeterson/percept2vec",
+      "label": "GitHub (Joshua Peterson)"
+    },
+    {
+      "name": "Adapting Deep Network Features to Capture Psychological Representations",
+      "quote": "There were 7,140 possible image comparisons, each of which was rated by 10 unique participants, for a total of 71,400 ratings from 209 different participants.",
+      "url": "https://arxiv.org/abs/1608.02164",
+      "label": "CogSci 2016 (arXiv)"
+    }
+  ],
+  "here": "Here: all 120 animal photographs, as 10 − the mean of people’s 0–10 similarity ratings (A) and as DINOv2 embeddings under cosine distance (B). The release numbers the photos; the names are ours. Groups are the nine clusters the authors found in the ratings.",
+  "cite": ["peterson_cogsci", "peterson_cogs", "percept2vec"],
+  "refs": {
+    "peterson_cogsci": {
+      "text": "Peterson JC, Abbott JT, Griffiths TL (2016). Adapting deep network features to capture psychological representations. Proceedings of the 38th Annual Conference of the Cognitive Science Society.",
+      "url": "https://arxiv.org/abs/1608.02164"
+    },
+    "peterson_cogs": {
+      "text": "Peterson JC, Abbott JT, Griffiths TL (2018). Evaluating (and improving) the correspondence between deep neural networks and human representations. Cognitive Science 42(8): 2648–2669.",
+      "url": "https://doi.org/10.1111/cogs.12670"
+    },
+    "percept2vec": {
+      "text": "Peterson JC. percept2vec: datasets for fitting CNN representations to human similarity judgments (animals.zip, turkResults_CogSci2016.mat). GitHub.",
+      "url": "https://github.com/jcpeterson/percept2vec"
+    }
+  }
+}

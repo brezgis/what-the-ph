@@ -1,0 +1,39 @@
+{
+  "title": "Man and monkey IT",
+  "about": [
+    {
+      "name": "Matching Categorical Object Representations in Inferior Temporal Cortex of Man and Monkey",
+      "quote": "Here, we presented monkeys and humans with the same images of real-world objects and measured the IT response pattern elicited by each image. In order to relate the representations between the species and to computational models, we compare response-pattern dissimilarity matrices. IT response patterns form category clusters, which match between man and monkey.",
+      "url": "https://doi.org/10.1016/j.neuron.2008.10.043",
+      "label": "Neuron"
+    },
+    {
+      "name": "Object Category Structure in Response Patterns of Neuronal Population in Monkey Inferior Temporal Cortex",
+      "quote": "We found that the categorical structure of objects is represented by the pattern of activity distributed over the cell population. Animate and inanimate objects created distinguishable clusters in the population code.",
+      "url": "https://doi.org/10.1152/jn.00024.2007",
+      "label": "Journal of Neurophysiology"
+    },
+    {
+      "name": "rsatoolbox",
+      "quote": "Python library for Representational Similarity Analysis",
+      "url": "https://github.com/rsagroup/rsatoolbox/tree/main/demos/92imageData",
+      "label": "GitHub (rsagroup)"
+    }
+  ],
+  "here": "Here: all 92 images, as the human-IT dissimilarity matrix of the paper’s Fig. 1, averaged over two fMRI sessions in each of four people (A), and the monkey-IT one from 674 neurons in two macaques (B). Both are 1 − Pearson r between response patterns, taken from the RSA toolbox’s copy of the paper’s supplemental data. The object names are ours.",
+  "cite": ["kriegeskorte2008", "kiani2007", "rsatoolbox"],
+  "refs": {
+    "kriegeskorte2008": {
+      "text": "Kriegeskorte N, Mur M, Ruff DA, Kiani R, Bodurka J, Esteky H, Tanaka K, Bandettini PA (2008). Matching categorical object representations in inferior temporal cortex of man and monkey. Neuron 60(6): 1126–1141.",
+      "url": "https://doi.org/10.1016/j.neuron.2008.10.043"
+    },
+    "kiani2007": {
+      "text": "Kiani R, Esteky H, Mirpour K, Tanaka K (2007). Object category structure in response patterns of neuronal population in monkey inferior temporal cortex. Journal of Neurophysiology 97(6): 4296–4309.",
+      "url": "https://doi.org/10.1152/jn.00024.2007"
+    },
+    "rsatoolbox": {
+      "text": "rsatoolbox authors. rsatoolbox: Python library for Representational Similarity Analysis, demos/92imageData (MIT licence).",
+      "url": "https://github.com/rsagroup/rsatoolbox"
+    }
+  }
+}
