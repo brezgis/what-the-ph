@@ -74,6 +74,11 @@ lists the papers behind it under "distance & references".
   dataset: a classical-MDS shadow, the condensed distance matrix, ripser barcodes
   (H₂ too, for the spheres), k-NN lists, TwoNN, Procrustes with a shuffled-chance
   baseline, RSA. The browser never computes geometry; it only animates.
+- `prep/generators.py` adds `gens` to those files: for each bar, the edges that
+  create and destroy it (gudhi, on an edge-collapsed complex), matched to the
+  ripser bars without changing them. Point at a bar and the page draws its
+  feature: the piece that merges, the loop (birth edge + the shortest path that
+  closes it), or the shell edge and the chord that fills a void.
 - `prep/datasets/<id>.py` — one module per dataset (`load()` returns two views of
   the same items, as feature vectors or as a published distance matrix), with
   `<id>.meta.json` holding official names and quotes.
@@ -87,6 +92,7 @@ module says where they come from) and a Python env:
 ```sh
 cd prep && uv sync && uv run python build.py            # everything
 uv run python build.py stars                             # one dataset
+uv run --with gudhi python generators.py                 # then: where each bar lives
 ```
 
 ## Credits and licences

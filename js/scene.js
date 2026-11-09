@@ -37,6 +37,10 @@
   };
 
   const GLYPHS = ['dot', 'ring', 'square', 'cross', 'tri', 'diamond', 'plus'];
+  // thumbnails that are pixel art: scaled by nearest neighbour, never smoothed
+  const PIXEL_ART = new Set(['pokemon']);
+  // thumbnails that are only a soft glow (star colours): nothing to see when enlarged
+  const GLOW = new Set(['stars']);
 
   class Scene {
     constructor(canvas) {
@@ -65,7 +69,8 @@
       this.resize();
       this.bindPointer();
       window.addEventListener('resize', () => this.resize());
-      if (document.fonts) document.fonts.ready.then(() => this.resize());
+      // labels are cached as bitmaps: redo them once the real font has arrived
+      if (document.fonts) document.fonts.ready.then(() => { this.labelCache = null; this.textW = null; this.resize(); });
       this.last = performance.now();
       requestAnimationFrame(t => this.frame(t));
     }
@@ -120,6 +125,7 @@
       this.kick(flat ? 0 : undefined);
       if (!(opts && opts.keepView)) { this.zoom = 1; this.pan = { x: 0, y: 0 }; this.viewGoal = null; }
       this.ds = ds;
+      this.textW = null;
       const n = ds.n;
       this.n = n;
       // Fit the bulk of each cloud to the frame, then pull outliers in softly, so
@@ -135,13 +141,21 @@
       });
       this.xyz = ds.views.map(v => fit(v.xyz, bulk(v.xyz)));
       this.nnMed = this.xyz.map(P3 => {
+        // squared distances in flat arrays: this runs on every dataset switch
         const m = P3.length, nn = new Float64Array(m).fill(Infinity);
-        for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
-          const d = Math.hypot(P3[i][0] - P3[j][0], P3[i][1] - P3[j][1], P3[i][2] - P3[j][2]);
-          if (d > 1e-9) { if (d < nn[i]) nn[i] = d; if (d < nn[j]) nn[j] = d; }
+        const X = new Float64Array(m), Y = new Float64Array(m), Z = new Float64Array(m);
+        for (let i = 0; i < m; i++) { X[i] = P3[i][0]; Y[i] = P3[i][1]; Z[i] = P3[i][2]; }
+        for (let i = 0; i < m; i++) {
+          const xi = X[i], yi = Y[i], zi = Z[i];
+          let best = nn[i];
+          for (let j = i + 1; j < m; j++) {
+            const dx = xi - X[j], dy = yi - Y[j], dz = zi - Z[j], d = dx * dx + dy * dy + dz * dz;
+            if (d > 1e-18) { if (d < best) best = d; if (d < nn[j]) nn[j] = d; }
+          }
+          nn[i] = best;
         }
         const f = Array.from(nn).filter(isFinite).sort((a, b) => a - b);
-        return f.length ? f[f.length >> 1] : 1;
+        return f.length ? Math.sqrt(f[f.length >> 1]) : 1;
       });
       // procrustes: both drawn at A's scale with no outlier squash, so residuals are honest
       const sA = bulk(ds.procrustes.a);
@@ -168,11 +182,21 @@
         return { i: I, j: J, d: D, r: R };
       });
       // barcodes, in drawing order, once
-      this.barOrder = ds.views.map(v => ({
-        h0: v.bars.filter(b => b[0] === 0).sort((p, q) => (q[2] ?? 9) - (p[2] ?? 9)),
-        h1: v.bars.filter(b => b[0] === 1).sort((p, q) => p[1] - q[1]),
-        h2: v.bars.filter(b => b[0] === 2).sort((p, q) => p[1] - q[1]),
-      }));
+      // (indices into view.bars, so a row can find its generator in view.gens);
+      // longest first, so the features that matter sit on top and stay clickable
+      const life = b => (b[2] === null ? 9 : b[2]) - b[1];
+      this.barOrder = ds.views.map(v => {
+        const ks = dim => v.bars.map((b, k) => k).filter(k => v.bars[k][0] === dim)
+          .sort((p, q) => life(v.bars[q]) - life(v.bars[p]) || v.bars[p][1] - v.bars[q][1]);
+        return { h0: ks(0), h1: ks(1), h2: ks(2) };
+      });
+      this.barScroll = {};
+      this.barHits = [];
+      this.barSections = [];
+      this.sel = null;
+      this.barHover = null;
+      this.featCache = new Map();
+      this.cellHover = null;
       this.rank = new Int32Array(n);
       ds.order.forEach((item, r) => (this.rank[item] = r));
       // each pair's distance as a percentile of its view (ties share their mean rank):
@@ -209,6 +233,7 @@
       const sameSprites = opts && opts.keepView && this.spriteFor === ds.id && this.tinted;
       if (!sameSprites) {
         this.tinted = null;
+        this.scaled = null;
         this.tipURLs = [];
         this.spriteFor = ds.id;
         this.loadSprites();
@@ -287,6 +312,8 @@
       });
     }
 
+    showsThumbs() { return !!this.ds.thumbs && !this.ds.glyphs && !GLOW.has(this.ds.id); }
+
     thumbURL(i) {
       if (this.ds.thumbsColor) return this.ds.thumbs[i];
       if (!this.tinted) return this.ds.thumbs ? this.ds.thumbs[i] : '';
@@ -320,6 +347,9 @@
       c.addEventListener('pointerdown', e => {
         pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
         c.setPointerCapture(e.pointerId);
+        this.down = { x: e.clientX, y: e.clientY };
+        const bar = e.pointerType === 'mouse' ? this.barHover : this.pickBar(e.clientX, e.clientY);
+        if (bar) { this.drag = { bar }; return; }
         this.viewGoal = null;
         this.spinSpeed = 0;
         if (this.nearDivider(e.clientX, e.clientY)) {
@@ -344,6 +374,8 @@
           return;
         }
         if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.drag && this.drag.bar) return;
+        if (!this.drag && this.hoverBars(e.clientX, e.clientY)) return;
         if (this.drag && this.drag.divider) {
           const { x, y, w, h } = this.stage;
           if (this.figSide) this.figRatio.side = Math.max(0.22, Math.min(0.7, (x + w - e.clientX) / w));
@@ -381,17 +413,37 @@
           this.drag = { x: q.x, y: q.y, yaw: this.yaw, pitch: this.pitch, t: performance.now(), lastX: q.x, pan: false };
           return;
         }
-        if (this.drag && !this.drag.pan && this.drag.vel) this.spinSpeed = Math.max(-3, Math.min(3, this.drag.vel));
+        const still = this.down && Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) < 6;
+        if (this.drag && this.drag.bar) {
+          if (still) this.selectBar(this.drag.bar.v, this.drag.bar.k);
+          this.drag = null;
+          return;
+        }
+        // a plain click on the cloud, away from any item, lets go of a pinned feature
+        if (still && this.sel && this.hover < 0 && !(this.drag && this.drag.divider)) this.selectBar(null);
+        if (this.drag && !this.drag.pan && this.drag.vel && !still) this.spinSpeed = Math.max(-3, Math.min(3, this.drag.vel));
         this.drag = null;
       };
       c.addEventListener('pointerup', up);
       c.addEventListener('pointercancel', up);
-      c.addEventListener('pointerleave', () => { this.hover = -1; this.dirty = true; this.onHover && this.onHover(null); });
+      c.addEventListener('pointerleave', () => {
+        this.hover = -1; this.dirty = true; this.onHover && this.onHover(null);
+        if (this.barHover || this.cellHover) { this.barHover = this.cellHover = null; this.onTip && this.onTip(null); }
+      });
       c.addEventListener('dblclick', () => this.resetView());
 
       // wheel and trackpad pinch (which arrives as ctrl+wheel) zoom the cloud only
       c.addEventListener('wheel', e => {
         e.preventDefault();
+        // over a barcode that has more rows than room: scroll it
+        const S = !e.ctrlKey && this.sectionAt(e.clientX, e.clientY);
+        if (S && S.maxScroll > 0) {
+          const unit = e.deltaMode === 1 ? 33 : 1;
+          this.barScroll[S.key] = Math.max(0, Math.min(S.maxScroll, (this.barScroll[S.key] || 0) + (e.deltaY * unit) / S.step / 2));
+          this.dirty = true;
+          this.hoverBars(e.clientX, e.clientY);
+          return;
+        }
         const unit = e.deltaMode === 1 ? 33 : 1;
         this.zoomAt(Math.exp(-e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY);
       }, { passive: false });
@@ -406,6 +458,54 @@
         g0 = e.scale;
       });
       document.addEventListener('gestureend', e => e.preventDefault());
+    }
+
+    // Pointer over the barcode or a distance matrix: tips and previews instead of
+    // turning the cloud. True when the pointer is over one of those.
+    hoverBars(x, y) {
+      const h = this.P.bars > 0.5 ? this.pickBar(x, y) : null;
+      const same = h && this.barHover && h.v === this.barHover.v && h.k === this.barHover.k;
+      if (h) {
+        if (!same) this.barHover = { v: h.v, k: h.k, f: this.feature(h.v, h.k) };
+        if (this.hover !== -1) { this.hover = -1; this.onHover && this.onHover(null); }
+        this.c.style.cursor = 'pointer';
+        this.onTip && this.onTip({ x, y, bar: this.barHover.f });
+        this.dirty = true;
+        return true;
+      }
+      if (this.barHover) {
+        this.barHover = null;
+        this.c.style.cursor = '';
+        this.onTip && this.onTip(null);
+        this.dirty = true;
+      }
+      if (this.P.mat > 0.6) {
+        const cell = this.cellAt(x, y);
+        if (cell) {
+          if (!this.cellHover || cell.r !== this.cellHover.r || cell.c !== this.cellHover.c) { this.cellHover = cell; this.dirty = true; }
+          this.onTip && this.onTip({ x, y, cell });
+          if (this.hover !== -1) { this.hover = -1; this.onHover && this.onHover(null); }
+          return true;
+        }
+        if (this.cellHover) { this.cellHover = null; this.onTip && this.onTip(null); this.dirty = true; }
+      }
+      return this.sectionAt(x, y) !== null && this.P.bars > 0.5;
+    }
+
+    // which pair of items a point on a distance matrix stands for
+    cellAt(x, y) {
+      const L = this.L || this.layout(), n = this.n, ord = this.ds.order;
+      for (let v = 0; v < 2; v++) {
+        if ((v === 0 ? this.P.showA : this.P.showB) < 0.5) continue;
+        const M = this.matRect(L, v);
+        if (x < M.x || y < M.y || x >= M.x + M.s || y >= M.y + M.s) continue;
+        const r = Math.floor(((y - M.y) / M.s) * n), c = Math.floor(((x - M.x) / M.s) * n);
+        const i = ord[r], j = ord[c];
+        if (i === j) return null;
+        const k = (a, b) => (a > b ? k(b, a) : n * a - (a * (a + 1)) / 2 + (b - a - 1));
+        return { v, r, c, i, j, pct: [this.pct[0][k(i, j)], this.pct[1][k(i, j)]] };
+      }
+      return null;
     }
 
     // zoom by factor f, keeping the cloud point under (px, py) where it is
@@ -477,7 +577,9 @@
       const { x, y, w, h } = this.stage, P = this.P;
       const s = P.split;
       this.figSide = this.P.sideT >= 0.5;
-      const r = (side ? this.figRatio.side : this.figRatio.below) * P.fig;
+      // a phone's stage is short: the figure underneath takes a smaller share
+      const below = this.W <= 760 ? Math.min(this.figRatio.below, 0.36) : this.figRatio.below;
+      const r = (side ? this.figRatio.side : below) * P.fig;
       let cloud, fig, divider;
       if (side) {
         const fw = w * r;
@@ -540,6 +642,203 @@
       return { x: L.cx0[v] - s / 2, y: L.cy0 - s / 2, s };
     }
 
+    // ---------- persistence features ----------
+    //
+    // view.gens (prep/generators.py) holds, per bar, the edges that create and
+    // destroy it. From those the scene rebuilds the feature itself:
+    //   H0  the piece that the death edge merges into an older one
+    //   H1  a loop: the birth edge plus the shortest path between its ends using
+    //       only edges that were already there (so it exists at birth, by construction)
+    //   H2  the edge that closes the shell, and the chord across the hollow that fills it
+
+    cond(v, i, j) {
+      if (i > j) [i, j] = [j, i];
+      return this.ds.views[v].dist[this.n * i - (i * (i + 1)) / 2 + (j - i - 1)];
+    }
+
+    // edges shorter than q‰ (the sorted list makes that a prefix)
+    prefixBelow(v, q) {
+      const E = this.edges[v];
+      let lo = 0, hi = E.d.length;
+      const x = (q - 0.5) / 1000;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (E.d[mid] < x) lo = mid + 1; else hi = mid; }
+      return lo;
+    }
+
+    feature(v, k) {
+      const key = v + ':' + k;
+      if (this.featCache.has(key)) return this.featCache.get(key);
+      const V = this.ds.views[v], bar = V.bars[k], gen = V.gens ? V.gens[k] : null, n = this.n;
+      const f = { v, k, dim: bar[0], birth: bar[1], death: bar[2], gen, located: !!V.gens, mask: null, pts: [], loop: null, chord: null, edge: null };
+      if (gen) {
+        const E = this.edges[v];
+        if (f.dim === 0) {
+          // union–find over every edge shorter than the merging one
+          const [u, w] = gen, K = this.prefixBelow(v, this.cond(v, u, w));
+          const up = new Int32Array(n).map((_, i) => i);
+          const find = x => { while (up[x] !== x) x = up[x] = up[up[x]]; return x; };
+          for (let e = 0; e < K; e++) { const a = find(E.i[e]), b = find(E.j[e]); if (a !== b) up[a] = b; }
+          const ru = find(u), rw = find(w), A = [], B = [];
+          for (let i = 0; i < n; i++) { const r = find(i); if (r === ru) A.push(i); else if (r === rw) B.push(i); }
+          f.pts = A.length <= B.length ? A : B;   // the younger piece: the smaller one
+          f.edge = [u, w];
+        } else {
+          const [bu, bv, du, dv] = gen;
+          f.edge = [bu, bv];
+          f.chord = [du, dv];
+          if (f.dim === 1) f.loop = this.shortestPath(v, bu, bv, this.cond(v, bu, bv));
+          f.pts = f.loop ? f.loop.slice() : [bu, bv, du, dv];
+          if (f.dim === 2) f.pts = [...new Set([bu, bv, du, dv])];
+        }
+        f.mask = new Uint8Array(n);
+        for (const i of f.pts) f.mask[i] = 1;
+        if (f.edge) { f.mask[f.edge[0]] = 1; f.mask[f.edge[1]] = 1; }
+      }
+      this.featCache.set(key, f);
+      return f;
+    }
+
+    // Dijkstra on a dense matrix (n ≤ a few hundred), over edges shorter than q‰
+    shortestPath(v, s, t, q) {
+      const n = this.n, E = this.edges[v];
+      let K = this.prefixBelow(v, q);
+      const run = (K, skipDirect) => {
+        const W = new Float32Array(n * n).fill(Infinity);
+        for (let e = 0; e < K; e++) {
+          const i = E.i[e], j = E.j[e];
+          if (skipDirect && ((i === s && j === t) || (i === t && j === s))) continue;
+          W[i * n + j] = W[j * n + i] = E.d[e];
+        }
+        const dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+        dist[s] = 0;
+        for (;;) {
+          let u = -1, best = Infinity;
+          for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+          if (u < 0 || u === t) break;
+          done[u] = 1;
+          const row = u * n;
+          for (let i = 0; i < n; i++) {
+            const w = W[row + i];
+            if (w !== Infinity && best + w < dist[i]) { dist[i] = best + w; prev[i] = u; }
+          }
+        }
+        if (dist[t] === Infinity) return null;
+        const path = [];
+        for (let x = t; x >= 0; x = prev[x]) path.push(x);
+        return path.reverse();
+      };
+      // ties at the birth length (distances are stored in ‰): allow those too
+      return run(K, false) || run(this.prefixBelow(v, q + 1), true);
+    }
+
+    // what to draw: the bar under the pointer previews, a clicked one stays
+    activeFeature(v) {
+      const f = this.barHover && this.barHover.f.gen ? this.barHover.f : this.sel;
+      return f && f.v === v && this.P.bars > 0.5 ? f : null;
+    }
+
+    selectBar(v, k) {
+      if (v === null || v === undefined) {
+        this.sel = null;
+      } else {
+        const f = this.feature(v, k);
+        this.sel = this.sel && this.sel.v === v && this.sel.k === k ? null : f;
+        // move ε into the feature's lifetime, so the complex shows it alive
+        if (this.sel && f.death !== null) this.set({ eps: (f.birth + f.death) / 2 }, 650);
+        if (this.sel) this.frameFeature(f);
+      }
+      this.dirty = true;
+      if (this.onFeature) this.onFeature(this.sel);
+    }
+
+    // glide the view so a small feature fills a good part of the cloud's room
+    frameFeature(f) {
+      const L = this.L || this.layout(), v = f.v;
+      const pts = f.pts.concat(f.edge || [], f.chord || []);
+      // a void is pinned by a few points around a hollow: framing them would hide the hollow
+      if (f.dim === 2 || pts.length < 3 || !L.R) return;
+      this.spinSpeed = 0;
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const i of pts) {
+        const X = (this.sx[v][i] - L.cx[v]) / L.R, Y = (this.sy[v][i] - L.cy) / L.R;   // in units of R
+        x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y);
+      }
+      const span = Math.max(x1 - x0, y1 - y0, 0.05);
+      const z = Math.max(1, Math.min(5, 1.1 / span));
+      if (z < 1.3 && this.zoom < 1.3) return;   // already big enough: leave the view alone
+      const cxN = (x0 + x1) / 2, cyN = (y0 + y1) / 2;
+      // in a split view, center on that cloud's own middle
+      this.viewGoal = { zoom: z, x: -cxN * L.R0 * z, y: -cyN * L.R0 * z };
+    }
+
+    clearFeature() {
+      this.sel = null;
+      this.barHover = null;
+      if (this.onFeature) this.onFeature(null);
+    }
+
+    pickBar(x, y) {
+      for (const h of this.barHits) {
+        if (x >= h.x0 && x <= h.x1 && y >= h.y - h.h / 2 && y < h.y + h.h / 2) return h;
+      }
+      return null;
+    }
+
+    sectionAt(x, y) {
+      return this.barSections.find(S => x >= S.x && x <= S.x + S.w && y >= S.y && y <= S.y + S.h) || null;
+    }
+
+    drawFeature(v, a) {
+      const f = this.activeFeature(v);
+      if (!f || !f.gen) return;
+      const ctx = this.ctx, sx = this.sx[v], sy = this.sy[v];
+      const pinned = this.sel === f;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = this.ink;
+      // the feature's points: rings
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (const i of f.pts) { ctx.moveTo(sx[i] + 7, sy[i]); ctx.arc(sx[i], sy[i], 7, 0, Math.PI * 2); }
+      ctx.stroke();
+      if (f.loop && f.loop.length > 1) {
+        // the loop, closed by its birth edge
+        ctx.lineWidth = pinned ? 2.6 : 2.2;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        f.loop.forEach((i, t) => (t ? ctx.lineTo(sx[i], sy[i]) : ctx.moveTo(sx[i], sy[i])));
+        ctx.closePath();
+        ctx.stroke();
+      } else if (f.edge && f.dim !== 0) {
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(sx[f.edge[0]], sy[f.edge[0]]);
+        ctx.lineTo(sx[f.edge[1]], sy[f.edge[1]]);
+        ctx.stroke();
+      }
+      if (f.chord) {
+        // the edge whose arrival fills it in
+        ctx.globalAlpha = a * 0.75;
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(sx[f.chord[0]], sy[f.chord[0]]);
+        ctx.lineTo(sx[f.chord[1]], sy[f.chord[1]]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (f.dim === 0 && f.edge) {
+        // H0: the bridge, dashed: it arrives at the bar's death
+        ctx.globalAlpha = a * 0.85;
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(sx[f.edge[0]], sy[f.edge[0]]);
+        ctx.lineTo(sx[f.edge[1]], sy[f.edge[1]]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
     // ---------- drawing ----------
 
     frame(now) {
@@ -557,8 +856,8 @@
         this.zoom += (g.zoom - this.zoom) * k;
         this.pan.x += (g.x - this.pan.x) * k;
         this.pan.y += (g.y - this.pan.y) * k;
-        if (Math.abs(this.zoom - 1) < 1e-3 && Math.hypot(this.pan.x, this.pan.y) < 0.5) {
-          this.zoom = 1; this.pan = { x: 0, y: 0 }; this.viewGoal = null;
+        if (Math.abs(this.zoom - g.zoom) < 1e-3 && Math.hypot(this.pan.x - g.x, this.pan.y - g.y) < 0.5) {
+          this.zoom = g.zoom; this.pan = { x: g.x, y: g.y }; this.viewGoal = null;
         }
         this.dirty = true;
       }
@@ -615,6 +914,7 @@
       ctx.strokeStyle = this.ink;
       ctx.fillStyle = this.ink;
       const L = this.layout();
+      this.L = L;
       this.project(L);
       const vis = [P.showA, P.showB];
 
@@ -633,6 +933,7 @@
         if (P.nn2 > 0) this.drawTwoNN(v, P.nn2 * vis[v]);
       }
       for (let v = 0; v < 2; v++) if (vis[v] > 0.01) this.drawPoints(v, vis[v]);
+      for (let v = 0; v < 2; v++) if (vis[v] > 0.01 && P.bars > 0.5) this.drawFeature(v, vis[v] * (P.bars - 0.5) * 2);
       const labelA = P.labels * (1 - clamp01(P.mat * 2));
       if (labelA > 0.01) for (let v = 0; v < 2; v++) if (vis[v] > 0.01) this.drawLabels(v, labelA * vis[v]);
       ctx.restore();
@@ -640,6 +941,8 @@
 
       this.curR0 = L.R0;
       if (P.fig > 0.5) this.drawDivider(L.divider, (P.fig - 0.5) * 2);
+      this.barHits = [];
+      this.barSections = [];
       if (P.fig > 0.02 && L.fig.h > 70 && L.fig.w > 90) {
         const F = L.fig;
         if (P.bars > 0) this.drawBarcodes(F, P.bars);
@@ -669,7 +972,7 @@
 
     nearDivider(px, py) {
       if (this.P.fig < 0.5) return false;
-      const D = this.layout().divider;
+      const D = (this.L || this.layout()).divider;
       if (!D) return false;
       return D.w ? Math.abs(py - D.y) < 8 && px >= D.x && px <= D.x + D.w
                  : Math.abs(px - D.x) < 8 && py >= D.y && py <= D.y + D.h;
@@ -677,6 +980,35 @@
 
     depthAlpha(v, i) {
       return 0.8 + 0.2 * clamp01((this.sz[v][i] + 1) / 2);
+    }
+
+    // Sprites pre-scaled to the size they are drawn at, in device pixels: every
+    // frame is then a 1:1 copy (crisp, and cheap), and resampling happens once,
+    // with good filtering, only when the size changes (zoom, resize).
+    spritesAt(ps) {
+      const dpr = this.dpr, want = Math.max(8, Math.min(360, ps * dpr));
+      const S = Math.round(Math.pow(2, Math.round(Math.log2(want) * 6) / 6));   // sixth-octave steps
+      // a few sizes at once: two clouds can want different ones
+      if (!this.scaled || this.scaled.src !== this.tinted) this.scaled = { src: this.tinted, sizes: new Map() };
+      const hit = this.scaled.sizes.get(S);
+      if (hit) return hit;
+      if (this.scaled.sizes.size >= 4) this.scaled.sizes.delete(this.scaled.sizes.keys().next().value);
+      const pixel = PIXEL_ART.has(this.ds.id);
+      const out = this.tinted.map(im => {
+        const asp = im.height / im.width;
+        const w = Math.max(1, Math.round(asp > 1 ? S / asp : S)), h = Math.max(1, Math.round(asp > 1 ? S : S * asp));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const g = cv.getContext('2d');
+        // pixel art scales by nearest neighbour; photos and drawings get smoothed
+        g.imageSmoothingEnabled = !(pixel && w >= im.width);
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(im, 0, 0, w, h);
+        return cv;
+      });
+      const entry = { S, imgs: out };
+      this.scaled.sizes.set(S, entry);
+      return entry;
     }
 
     drawPoints(v, a) {
@@ -692,35 +1024,56 @@
       const floor = Math.max(7, Math.min(16, (this.curR0 || 200) * 0.09));   // small clouds (phones) get small pictures
       const ps = Math.max(floor, Math.min(base, spacing * 2.6)) * grow;
       this.pickR = Math.max(15, ps * 0.45);
-      // far points first, so near thumbnails sit on top
-      let order = null;
+      const F = this.activeFeature(v), mask = F && F.mask;
+      const sx = this.sx[v], sy = this.sy[v];
+      // per-point opacity, then drawn in a few batches of equal opacity: one path
+      // per (glyph, opacity) instead of one per point
+      if (!this.alphaBuf || this.alphaBuf.length !== n) this.alphaBuf = new Float32Array(n);
+      const al = this.alphaBuf;
+      for (let i = 0; i < n; i++) {
+        let x = this.depthAlpha(v, i);
+        if (P.knn > 0) x = lerp(x, 0.25 + 0.75 * ov[i], P.knn);
+        if (twin && i !== this.hover && P.knn > 0.5) x *= 0.6;
+        if (mask && !mask[i]) x *= 0.3;
+        al[i] = x;
+      }
+      if (pics < 1) {
+        const LV = 8, buckets = new Map();
+        for (let i = 0; i < n; i++) {
+          const kind = g ? GLYPHS[g[i] % GLYPHS.length] : 'dot';
+          const key = kind + Math.round(al[i] * LV);
+          let b = buckets.get(key);
+          if (!b) buckets.set(key, (b = { kind, q: Math.round(al[i] * LV) / LV, list: [] }));
+          b.list.push(i);
+        }
+        ctx.lineWidth = 1.4;
+        for (const b of buckets.values()) {
+          ctx.globalAlpha = a * b.q * (1 - pics);
+          ctx.beginPath();
+          for (const i of b.list) this.glyphPath(sx[i], sy[i], r, b.kind);
+          if (b.kind === 'dot' || b.kind === 'diamond') ctx.fill(); else ctx.stroke();
+        }
+      }
       if (pics > 0) {
+        // far points first, so near thumbnails sit on top
         if (!this.orderBuf || this.orderBuf.length !== n) this.orderBuf = new Uint16Array(n);
-        order = this.orderBuf;
+        const order = this.orderBuf;
         for (let i = 0; i < n; i++) order[i] = i;
         const z = this.sz[v];
         order.sort((p, q) => z[p] - z[q] || p - q);   // ties broken by index: no swapping
-      }
-      for (let k = 0; k < n; k++) {
-        const i = order ? order[k] : k;
-        let al = this.depthAlpha(v, i);
-        if (P.knn > 0) al = lerp(al, 0.25 + 0.75 * ov[i], P.knn);
-        if (twin && i !== this.hover && P.knn > 0.5) al *= 0.6;
-        if (pics < 1) {
-          ctx.globalAlpha = a * al * (1 - pics);
-          this.glyph(this.sx[v][i], this.sy[v][i], r, g ? GLYPHS[g[i] % GLYPHS.length] : 'dot');
-        }
-        if (pics > 0) {
-          const im = this.tinted[i], asp = im.height / im.width;
-          const w = asp > 1 ? ps / asp : ps, h = asp > 1 ? ps : ps * asp;
-          ctx.globalAlpha = a * pics * (0.55 + 0.45 * al);
-          ctx.drawImage(im, this.sx[v][i] - w / 2, this.sy[v][i] - h / 2, w, h);
+        const SP = this.spritesAt(ps), dpr = this.dpr;
+        for (let k = 0; k < n; k++) {
+          const i = order[k], im = SP.imgs[i];
+          const w = im.width / dpr, h = im.height / dpr;
+          ctx.globalAlpha = a * pics * (0.55 + 0.45 * al[i]) * (mask && !mask[i] ? 0.45 : 1);
+          // land on whole device pixels, so the copy stays 1:1
+          ctx.drawImage(im, Math.round((sx[i] - w / 2) * dpr) / dpr, Math.round((sy[i] - h / 2) * dpr) / dpr, w, h);
         }
       }
-      if (this.hover >= 0) {
-        const i = this.hover, x = this.sx[v][i], y = this.sy[v][i];
+      if (this.hover >= 0) {   // in both clouds: the item and its twin
+        const i = this.hover, x = sx[i], y = sy[i];
         ctx.globalAlpha = a;
-        if (pics > 0) {
+        if (pics > 0 && !GLOW.has(this.ds.id)) {
           // the hovered item, big enough to actually see
           const im = this.tinted[i], asp = im.height / im.width, Z = ps * 2.6;
           const w = asp > 1 ? Z / asp : Z, h = asp > 1 ? Z : Z * asp;
@@ -729,13 +1082,30 @@
           ctx.fillStyle = this.ink;
           ctx.lineWidth = 1.2;
           ctx.strokeRect(x - w / 2 - 6, y - h / 2 - 6, w + 12, h + 12);
+          ctx.imageSmoothingEnabled = !PIXEL_ART.has(this.ds.id);
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+          ctx.imageSmoothingEnabled = true;
         } else {
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.arc(x, y, r + 7, 0, Math.PI * 2);
           ctx.stroke();
         }
+      }
+    }
+
+    // adds one glyph to the current path; the caller fills (dot, diamond) or strokes
+    glyphPath(x, y, r, kind) {
+      const ctx = this.ctx;
+      switch (kind) {
+        case 'ring': ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); return;
+        case 'square': ctx.rect(x - r * .85, y - r * .85, r * 1.7, r * 1.7); return;
+        case 'cross': ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); return;
+        case 'plus': ctx.moveTo(x - r * 1.2, y); ctx.lineTo(x + r * 1.2, y); ctx.moveTo(x, y - r * 1.2); ctx.lineTo(x, y + r * 1.2); return;
+        case 'tri': ctx.moveTo(x, y - r * 1.15); ctx.lineTo(x + r, y + r * .7); ctx.lineTo(x - r, y + r * .7); ctx.closePath(); return;
+        case 'diamond': ctx.moveTo(x, y - r * 1.2); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.2); ctx.lineTo(x - r, y); ctx.closePath(); return;
+        default: ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2);
       }
     }
 
@@ -761,8 +1131,10 @@
       const L = v === 1 && this.ds.labelsB ? this.ds.labelsB : this.ds.labels;
       // items that land on the same spot (identical candies…) share one label
       const spots = new Map();
+      const W = this.textW || (this.textW = new Map());
+      const width = t => { let w = W.get(t); if (w === undefined) W.set(t, (w = ctx.measureText(t).width)); return w; };
       for (let i = 0; i < this.n; i++) {
-        const key = Math.round(this.sx[v][i] / 3) + ',' + Math.round(this.sy[v][i] / 3);
+        const key = Math.round(this.sx[v][i] / 3) * 65536 + Math.round(this.sy[v][i] / 3);
         if (!spots.has(key)) spots.set(key, []);
         spots.get(key).push(i);
       }
@@ -778,15 +1150,36 @@
         const i = items[0];
         if (C && (this.sx[v][i] < C.x || this.sx[v][i] > C.x + C.w || this.sy[v][i] < C.y || this.sy[v][i] > C.y + C.h)) continue;
         const text = items.slice(0, 2).map(j => L[j]).join(', ') + (items.length > 2 ? ` +${items.length - 2}` : '');
-        const x = this.sx[v][i] + 10, y = this.sy[v][i] - 10, w = ctx.measureText(text).width;
+        const x = this.sx[v][i] + 10, y = this.sy[v][i] - 10, w = width(text);
         const box = [x - 2, y - 9, x + w + 2, y + 9];
         if (placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
         placed.push(box);
         now.add(i);
         ctx.globalAlpha = a * this.depthAlpha(v, i);
-        ctx.fillText(text, x, y);
+        const sp = this.labelSprite(text);
+        ctx.drawImage(sp, Math.round(x * this.dpr) / this.dpr - 2, Math.round((y - 11) * this.dpr) / this.dpr, sp.width / this.dpr, sp.height / this.dpr);
       }
       (this.shownLabels = this.shownLabels || [])[v] = now;
+    }
+
+    // a label rendered once at device resolution; drawing a bitmap is far cheaper than text
+    labelSprite(text) {
+      const key = this.dpr + '|' + text;
+      const C = this.labelCache || (this.labelCache = new Map());
+      let cv = C.get(key);
+      if (cv) return cv;
+      if (C.size > 3000) C.clear();
+      const ctx = this.ctx, dpr = this.dpr, w = Math.ceil(ctx.measureText(text).width) + 4;
+      cv = document.createElement('canvas');
+      cv.width = Math.ceil(w * dpr); cv.height = Math.ceil(22 * dpr);
+      const g = cv.getContext('2d');
+      g.scale(dpr, dpr);
+      g.font = ctx.font;
+      g.fillStyle = this.ink;
+      g.textBaseline = 'middle';
+      g.fillText(text, 2, 11);
+      C.set(key, cv);
+      return cv;
     }
 
     // every item drawn at (about) the same place as item i in view v
@@ -814,8 +1207,9 @@
 
     drawLinks(a, resid) {
       const ctx = this.ctx, n = this.n;
-      ctx.lineWidth = resid ? 1.3 : 0.8;
-      ctx.globalAlpha = a * (resid ? 0.75 : (n > 150 ? 0.14 : 0.32));
+      // bulk lines are one device pixel wide: crisp, and far cheaper to rasterize
+      ctx.lineWidth = resid ? 1.3 : this.hair();
+      ctx.globalAlpha = a * (resid ? 0.75 : (n > 150 ? 0.2 : 0.45));
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
         ctx.moveTo(this.sx[0][i], this.sy[0][i]);
@@ -833,10 +1227,13 @@
       }
     }
 
+    // one device pixel: the cheapest, sharpest line a canvas draws
+    hair() { return 1 / this.dpr; }
+
     drawKnn(v, a) {
       const ctx = this.ctx, nb = this.ds.views[v].nbrs, n = this.n;
-      ctx.lineWidth = 0.9;
-      ctx.globalAlpha = a * (n > 150 ? 0.26 : 0.45);
+      ctx.lineWidth = this.hair();
+      ctx.globalAlpha = a * (n > 150 ? 0.38 : 0.62);
       ctx.beginPath();
       for (let i = 0; i < n; i++) for (const j of nb[i]) {
         ctx.moveTo(this.sx[v][i], this.sy[v][i]);
@@ -872,13 +1269,14 @@
         }
         ctx.stroke();
       };
-      ctx.lineWidth = 1.1;
-      const base = this.hover < 0 ? (n > 150 ? 0.4 : 0.65) : 0.2;
+      ctx.lineWidth = this.hair();
+      const base = this.hover < 0 ? (n > 150 ? 0.55 : 0.8) : 0.25;
       pass(base, 0, [], -1);          // first neighbour: solid
       pass(base, 1, [2, 3], -1);      // second neighbour: dashed
       if (this.hover >= 0) {           // the hovered point, at full strength
+        ctx.lineWidth = 1.4;
         pass(1, 0, [], this.hover);
-        pass(1, 1, [2, 3], this.hover);
+        pass(1, 1, [3, 3], this.hover);
       }
       ctx.setLineDash([]);
     }
@@ -908,16 +1306,19 @@
       const sx = this.sx[v], sy = this.sy[v];
       const S = this.ripsSelection(v, this.P.eps);
       if (!S.count) return;
+      if (this.activeFeature(v)) a *= 0.3;   // the feature on top reads first
       const dense = this.n > 150;
       const thin = Math.max(0.05, Math.min(0.38, (3.5 * this.n) / S.count));
       // a sample stands in for the rest, but only partly: past a point, more lines must not read as more ink
-      ctx.lineWidth = 0.8;
-      ctx.globalAlpha = a * Math.min(dense ? 0.18 : 0.38, thin / Math.sqrt(S.keep));
+      ctx.lineWidth = this.hair();
+      ctx.globalAlpha = a * Math.min(dense ? 0.26 : 0.55, 1.4 * thin / Math.sqrt(S.keep));
       ctx.beginPath();
       for (const k of S.old) { ctx.moveTo(sx[E.i[k]], sy[E.i[k]]); ctx.lineTo(sx[E.j[k]], sy[E.j[k]]); }
       ctx.stroke();
-      ctx.lineWidth = 1.4;
-      ctx.globalAlpha = a * (dense ? 0.35 : 0.95);
+      // just-born edges stand out by weight while they are few, by ink when they are many
+      const many = S.fresh.length > 250;
+      ctx.lineWidth = many ? this.hair() : 1.4;
+      ctx.globalAlpha = a * (many ? 0.75 : dense ? 0.35 : 0.95);
       ctx.beginPath();
       for (const k of S.fresh) { ctx.moveTo(sx[E.i[k]], sy[E.i[k]]); ctx.lineTo(sx[E.j[k]], sy[E.j[k]]); }
       ctx.stroke();
@@ -956,7 +1357,8 @@
 
     drawMatrices(L, a) {
       const ctx = this.ctx, imgs = this.getMatImgs();
-      ctx.imageSmoothingEnabled = this.n > 200;
+      // one cell per item pair: hard-edged when enlarged, smoothed only when squeezed
+      ctx.imageSmoothingEnabled = this.n > this.matRect(L, 0).s * this.dpr;
       for (let v = 0; v < 2; v++) {
         if ((v === 0 ? this.P.showA : this.P.showB) < 0.05) continue;
         const M = this.matRect(L, v);
@@ -971,6 +1373,16 @@
         const name = `${v ? 'B' : 'A'} · ${this.ds.views[v].name.toUpperCase()}`, full = `${name} · distance matrix`;
         ctx.fillText(ctx.measureText(full).width < M.s * 1.1 ? full : name, M.x + M.s / 2, M.y - 16);
         ctx.textAlign = 'left';
+        if (this.cellHover) {
+          // the same pair in both matrices (same order), and its row and column
+          const { r, c } = this.cellHover, u = M.s / this.n, cs = Math.max(u, 5);
+          ctx.globalAlpha = a * 0.25;
+          ctx.fillRect(M.x, M.y + (r + 0.5) * u - 0.5, M.s, 1);
+          ctx.fillRect(M.x + (c + 0.5) * u - 0.5, M.y, 1, M.s);
+          ctx.globalAlpha = a;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(M.x + (c + 0.5) * u - cs / 2, M.y + (r + 0.5) * u - cs / 2, cs, cs);
+        }
       }
     }
 
@@ -979,9 +1391,10 @@
       ctx.globalAlpha = a * 0.45;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(F.x, F.y);
-      ctx.lineTo(F.x, F.y + F.h);
-      ctx.lineTo(F.x + F.w, F.y + F.h);
+      const ax = Math.round(F.x) + 0.5, ay = Math.round(F.y + F.h) + 0.5;
+      ctx.moveTo(ax, F.y);
+      ctx.lineTo(ax, ay);
+      ctx.lineTo(F.x + F.w, ay);
       ctx.stroke();
       ctx.globalAlpha = a * 0.9;
       ctx.font = '400 13.5px "IBM Plex Mono", monospace';
@@ -1004,14 +1417,25 @@
       const B = this.figBox(F, 1.6), ctx = this.ctx;
       this.axes(B, `distance rank in ${this.ds.views[0].name}`, `distance rank in ${this.ds.views[1].name}`, a);
       ctx.globalAlpha = a * (this.pairs.length > 1500 ? 0.35 : 0.7);
-      for (const [x, y] of this.pairs) ctx.fillRect(B.x + x * B.w - 1.5, B.y + (1 - y) * B.h - 1.5, 3, 3);
+      ctx.beginPath();
+      for (const [x, y] of this.pairs) ctx.rect(B.x + x * B.w - 1.25, B.y + (1 - y) * B.h - 1.25, 2.5, 2.5);
+      ctx.fill();
+      if (this.cellHover) {
+        // the hovered pair in the scatter
+        const [x, y] = this.cellHover.pct;
+        ctx.globalAlpha = a;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(B.x + x * B.w, B.y + (1 - y) * B.h, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
 
     drawBarcodes(F, a) {
       const P = this.P;
       const two = P.split > 0.5 && P.showB > 0.5;
       const views = two ? [0, 1] : [this.focus];
-      const L = this.layout();
+      const L = this.L || this.layout();
       views.forEach(v => {
         const w = two ? Math.min(F.w / 2 - 30, L.R0 * 2.1) : Math.min(F.w * 0.8, 640);
         const cx = two ? L.cx0[v] : F.x + F.w / 2;
@@ -1020,45 +1444,84 @@
     }
 
     drawBarcode(v, B, a) {
-      const ctx = this.ctx, eps = this.P.eps;
+      const ctx = this.ctx, eps = this.P.eps, bars = this.ds.views[v].bars;
       const { h0, h1, h2 } = this.barOrder[v];
       const X = t => B.x + Math.min(t, 1) * B.w;
-      const gap = 12;
+      const gap = 14;
       // H₀ gets half the height; loops and (if computed) voids share the rest
       const parts = h2.length ? [0.5, 0.3, 0.2] : h1.length ? [0.55, 0.45, 0] : [1, 0, 0];
       const avail = B.h - gap * (parts.filter(x => x > 0).length - 1);
-      const h0H = avail * parts[0], h1H = avail * parts[1], h2H = avail * parts[2];
-      const rows = (list, y0, H, label) => {
-        const step = H / Math.max(list.length, 1), lw = Math.max(0.5, Math.min(2.4, step * 0.6));
-        ctx.lineWidth = lw;
-        list.forEach((b, k) => {
-          const y = y0 + (k + 0.5) * step, d = b[2] === null ? 1.02 : b[2];
+      const act = this.activeFeature(v), hov = this.barHover && this.barHover.v === v ? this.barHover.k : -1;
+      const selK = this.sel && this.sel.v === v ? this.sel.k : -1;
+      const MIN = 4;   // thinnest row that can still be pointed at; more rows scroll
+      const rows = (list, dim, y0, H, label) => {
+        if (H <= 4) return;
+        const step = Math.max(MIN, H / Math.max(list.length, 1));
+        const fit = Math.max(1, Math.floor(H / step + 1e-6));
+        const maxScroll = Math.max(0, list.length - fit);
+        const key = v + ':' + dim;
+        const top = Math.round(Math.max(0, Math.min(maxScroll, this.barScroll[key] || 0)));
+        this.barScroll[key] = Math.max(0, Math.min(maxScroll, this.barScroll[key] || 0));
+        const lw = Math.max(1, Math.min(3, step * 0.6));
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(B.x - 2, y0 - 1, B.w + 4, H + 2);
+        ctx.clip();
+        for (let r = 0; r < fit && top + r < list.length; r++) {
+          const k = list[top + r], b = bars[k];
+          const y = Math.round(y0 + (r + 0.5) * step) + (lw % 2 ? 0.5 : 0), d = b[2] === null ? 1.02 : b[2];
           const alive = b[1] <= eps && d > eps, born = b[1] <= eps;
-          ctx.globalAlpha = a * (alive ? 1 : born ? 0.45 : 0.22);
+          const lit = k === hov || k === selK;
+          ctx.lineWidth = lit ? Math.max(lw + 1.5, 3) : lw;
+          ctx.globalAlpha = a * (lit ? 1 : (act ? 0.5 : 1) * (alive ? 1 : born ? 0.45 : 0.22));
           ctx.beginPath();
           ctx.moveTo(X(b[1]), y);
           ctx.lineTo(X(born ? Math.min(d, Math.max(eps, b[1])) : d), y);
           ctx.stroke();
           if (born && d > eps) {
-            ctx.globalAlpha = a * 0.12;
+            ctx.globalAlpha = a * (lit ? 0.4 : 0.12);
             ctx.beginPath(); ctx.moveTo(X(eps), y); ctx.lineTo(X(d), y); ctx.stroke();
           }
-        });
+          if (lit) {
+            // the whole lifetime, end to end, with its ends ticked
+            ctx.globalAlpha = a;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(X(b[1]), y - 5); ctx.lineTo(X(b[1]), y + 5);
+            if (b[2] !== null) { ctx.moveTo(X(d), y - 5); ctx.lineTo(X(d), y + 5); }
+            ctx.stroke();
+          }
+          this.barHits.push({ v, k, x0: B.x - 34, x1: B.x + B.w + 6, y, h: step });
+        }
+        ctx.restore();
         ctx.globalAlpha = a * 0.7;
         ctx.font = '500 15px "IBM Plex Mono", monospace';
         ctx.textAlign = 'right';
         ctx.fillText(label, B.x - 10, y0 + 13);
+        ctx.font = '400 11.5px "IBM Plex Mono", monospace';
+        ctx.globalAlpha = a * 0.5;
+        ctx.fillText(String(list.length), B.x - 10, y0 + 29);
         ctx.textAlign = 'left';
+        if (maxScroll > 0) {
+          // a thin scrollbar: where this window sits among all the bars
+          const tx = B.x + B.w + 8, th = Math.max(14, H * fit / list.length), ty = y0 + (H - th) * (top / maxScroll);
+          ctx.globalAlpha = a * 0.15;
+          ctx.fillRect(tx, y0, 2, H);
+          ctx.globalAlpha = a * 0.6;
+          ctx.fillRect(tx - 0.5, ty, 3, th);
+        }
+        this.barSections.push({ v, dim, key, x: B.x - 40, y: y0, w: B.w + 56, h: H, step, maxScroll });
       };
-      rows(h0, B.y, h0H, 'H₀');
-      if (h1.length) rows(h1, B.y + h0H + gap, h1H, 'H₁');
-      if (h2.length) rows(h2, B.y + h0H + gap + h1H + gap, h2H, 'H₂');
+      rows(h0, 0, B.y, avail * parts[0], 'H₀');
+      if (h1.length) rows(h1, 1, B.y + avail * parts[0] + gap, avail * parts[1], 'H₁');
+      if (h2.length) rows(h2, 2, B.y + avail * (parts[0] + parts[1]) + 2 * gap, avail * parts[2], 'H₂');
       // the ε line
       ctx.globalAlpha = a * 0.8;
       ctx.lineWidth = 1;
+      const ex = Math.round(X(eps)) + 0.5;
       ctx.beginPath();
-      ctx.moveTo(X(eps), B.y - 4);
-      ctx.lineTo(X(eps), B.y + B.h + 2);
+      ctx.moveTo(ex, B.y - 4);
+      ctx.lineTo(ex, B.y + B.h + 2);
       ctx.stroke();
       ctx.globalAlpha = a * 0.9;
       ctx.font = '400 13.5px "IBM Plex Mono", monospace';
@@ -1076,12 +1539,33 @@
       this.axes(B, 'log(2nd ÷ 1st neighbor distance)', 'how rare that ratio is', a);
       for (const v of series) {
         const mu = this.ds.views[v].mu, N = mu.length, d = this.ds.views[v].twoNN;
+        ctx.globalAlpha = a * 0.6;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
         for (let k = 0; k < N; k++) {
           const x = Math.log(mu[k]), y = -Math.log(1 - (k + 1) / (N + 1));
-          ctx.globalAlpha = a * 0.6;
           const px = B.x + (x / xmax) * B.w, py = B.y + B.h - (y / ymax) * B.h;
           if (px > B.x + B.w || py < B.y) continue;
-          this.glyph(px, py, 3.2, v === 0 ? 'dot' : 'ring');
+          this.glyphPath(px, py, 3.2, v === 0 ? 'dot' : 'ring');
+        }
+        if (v === 0) ctx.fill(); else ctx.stroke();
+        // the hovered item's own ratio r2/r1, found among the sorted ones
+        if (this.hover >= 0) {
+          const i = this.hover, nb = this.ds.views[v].nbrs[i];
+          const r1 = this.cond(v, i, nb[0]), r2 = this.cond(v, i, nb[1]);
+          if (r1 > 0) {
+            const m = r2 / r1;
+            let lo = 0, hi = N - 1;
+            while (lo < hi) { const mid = (lo + hi) >> 1; if (mu[mid] < m) lo = mid + 1; else hi = mid; }
+            if (lo > 0 && Math.abs(mu[lo - 1] - m) < Math.abs(mu[lo] - m)) lo--;
+            const px = B.x + (Math.min(Math.log(mu[lo]), xmax) / xmax) * B.w;
+            const py = B.y + B.h - (Math.min(-Math.log(1 - (lo + 1) / (N + 1)), ymax) / ymax) * B.h;
+            ctx.globalAlpha = a;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(px, py, 7, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
         if (d === null || d === undefined) continue;   // too many identical points to say
         // the line through the origin with the maximum-likelihood slope

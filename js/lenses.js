@@ -18,8 +18,12 @@
   const agreement = x =>
     x >= 0.8 ? 'very similar' : x >= 0.55 ? 'clearly related' : x >= 0.3 ? 'loosely related' : x >= 0.1 ? 'barely related' : 'unrelated';
 
-  const stat = (label, value, tag) =>
-    `<div class="stat"><span class="k">${label}</span><span class="v">${value}</span>${tag ? `<span class="t">${tag}</span>` : ''}</div>`;
+  const stat = (label, value, tag, bar) =>
+    `<div class="stat"><span class="k">${label}</span>${bar
+      ? `<button class="v" data-bar="${bar}" title="show it in the cloud">${value}</button>`
+      : `<span class="v">${value}</span>`}${tag ? `<span class="t">${tag}</span>` : ''}</div>`;
+  // "view:index" of a bar, for a readout number that can be clicked to show it
+  const barRef = (ds, v, b) => (b ? `${v}:${ds.views[v].bars.indexOf(b)}` : '');
 
   // one view on its own: show only that view
   const solo = v => (v === 0 ? { showA: 1, showB: 0 } : { showA: 0, showB: 1 });
@@ -113,12 +117,13 @@
           const b = x.bars.filter(y => y[0] === 2).reduce((m, y) => (!m || y[2] - y[1] > m[2] - m[1] ? y : m), null);
           return b ? f2(b[2] - b[1]) : '—';
         };
-        if (mode === 'two') return ds.views.map(x => stat(`${x.name}`, one(x), ds.h2 ? `longest loop · void ${voids(x)}` : 'longest loop')).join('');
+        if (mode === 'two') return ds.views.map((x, i) => stat(`${x.name}`, one(x), ds.h2 ? `longest loop · void ${voids(x)}` : 'longest loop', barRef(ds, i, longestLoop(x)))).join('');
         const b = longestLoop(ds.views[v]);
         const loops = ds.views[v].bars.filter(x => x[0] === 1 && x[2] - x[1] > 0.05).length;
-        return stat('longest loop', one(ds.views[v]), b ? `born ε ${f2(b[1])}, dies ε ${f2(b[2])}` : 'no loops')
+        return stat('longest loop', one(ds.views[v]), b ? `born ε ${f2(b[1])}, dies ε ${f2(b[2])}` : 'no loops', barRef(ds, v, b))
           + stat('loops > 0.05', loops)
-          + (ds.h2 ? stat('longest void', voids(ds.views[v]), 'H₂: a hollow inside, like a sphere’s') : '');
+          + (ds.h2 ? stat('longest void', voids(ds.views[v]), 'H₂: a hollow inside, like a sphere’s',
+            barRef(ds, v, ds.views[v].bars.filter(y => y[0] === 2).reduce((m, y) => (!m || y[2] - y[1] > m[2] - m[1] ? y : m), null))) : '');
       },
       reading: ['ph_edelsbrunner', 'ph_ghrist', 'ph_carlsson', 'ripser'],
     },

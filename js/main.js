@@ -104,6 +104,7 @@
 
   function closePop() {
     $('pop').hidden = true;
+    $('pop').classList.remove('wide');
     if (popFor) popFor.setAttribute('aria-expanded', 'false');
     popFor = null;
   }
@@ -121,6 +122,11 @@
     b.onclick = () => openPop(b, items, active, onPick);
     return b;
   }
+  function datasetPick() {
+    const b = pick(ds.title, [], cur.id, null, 'ds');
+    b.onclick = () => openDatasets(b);
+    return b;
+  }
   const word = t => Object.assign(document.createElement('span'), { className: 'w', textContent: t });
 
   function renderSentence(L) {
@@ -135,7 +141,7 @@
     ];
     s.append(
       word(two ? 'compare' : 'look at'),
-      pick(ds.title, index.map(d => ({ key: d.id, label: d.title })), cur.id, id => select(id, cur.metric, cur.lens, cur.view), 'ds'),
+      datasetPick(),
       about(),
       word('as'),
       pick(viewItems.find(x => x.key === cur.view).label, viewItems, cur.view, v => {
@@ -149,6 +155,58 @@
       pick(L.label, LENSES.map(l => ({ key: l.key, label: l.label, hint: l.modes.includes('one') ? '' : 'two clouds' })), cur.lens,
         k => select(cur.id, cur.metric, k, cur.view)),
     );
+  }
+
+  // The dataset list, by what kind of thing it is. Anything not listed here
+  // (a dataset added later) lands in "more".
+  const SHELVES = [
+    ['language models', ['layers', 'clock', 'numbers', 'clocks', 'emoji']],
+    ['languages', ['grambank']],
+    ['minds & brains', ['states', 'colors', 'cortex', 'peterson']],
+    ['pictures', ['turntable', 'doodles', 'mnist', 'pokemon', 'bobross', 'songbirds']],
+    ['the natural world', ['stars', 'cities', 'elements', 'eggs', 'fungi', 'cellcycle']],
+    ['everything else', ['candy']],
+  ];
+
+  function prefetch(id) {
+    getBase(id).then(b => getGeo(id, b.defaultMetric)).catch(() => {});
+  }
+
+  function openDatasets(btn) {
+    const pop = $('pop');
+    if (popFor === btn) return closePop();
+    const placed = new Set(SHELVES.flatMap(s => s[1]));
+    const shelves = SHELVES.map(([name, ids]) => [name, ids.filter(id => index.some(d => d.id === id))])
+      .concat([['more', index.filter(d => !placed.has(d.id)).map(d => d.id)]])
+      .filter(s => s[1].length);
+    const title = id => index.find(d => d.id === id).title;
+    pop.innerHTML = `<input class="find" type="search" placeholder="find a dataset" aria-label="find a dataset">
+      <div class="shelves">${shelves.map(([name, ids]) => `<section><h3>${name}</h3>${ids.map(id =>
+        `<button role="option" data-id="${id}" aria-selected="${id === cur.id}"><span>${title(id)}</span></button>`).join('')}</section>`).join('')}</div>`;
+    pop.classList.add('wide');
+    const find = pop.querySelector('.find');
+    find.oninput = () => {
+      const q = find.value.trim().toLowerCase();
+      for (const b of pop.querySelectorAll('button[data-id]')) b.hidden = q && !(b.textContent + ' ' + b.dataset.id).toLowerCase().includes(q);
+      for (const sec of pop.querySelectorAll('section')) sec.hidden = ![...sec.querySelectorAll('button')].some(b => !b.hidden);
+    };
+    find.onkeydown = e => {
+      if (e.key === 'Enter') { const b = [...pop.querySelectorAll('button[data-id]')].find(x => !x.hidden); if (b) b.click(); }
+      if (e.key === 'ArrowDown') { const b = [...pop.querySelectorAll('button[data-id]')].find(x => !x.hidden); if (b) { b.focus(); e.preventDefault(); } }
+    };
+    for (const b of pop.querySelectorAll('button[data-id]')) {
+      // start fetching on intent, so the click usually finds the data already here
+      b.onpointerenter = b.onfocus = () => prefetch(b.dataset.id);
+      b.onclick = () => { closePop(); select(b.dataset.id, cur.metric, cur.lens, cur.view); };
+    }
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - pop.offsetWidth / 2, innerWidth - pop.offsetWidth - 8)) + 'px';
+    placePop(pop, r);
+    popFor = btn;
+    btn.setAttribute('aria-expanded', 'true');
+    if (matchMedia('(pointer: fine)').matches) find.focus();
+    else (pop.querySelector('[aria-selected="true"]') || find).scrollIntoView({ block: 'nearest' });
   }
 
   // ⓘ: the dataset's official name, the creators' own words, and the citations
@@ -193,9 +251,14 @@
   }
 
   function tex(el, src) {
+    el.dataset.tex = src;
     if (window.katex) katex.render(src, el, { displayMode: true, throwOnError: false });
-    else el.textContent = src;
+    else el.textContent = '';   // typeset when KaTeX arrives (it loads async)
   }
+  addEventListener('katex', () => {
+    for (const el of document.querySelectorAll('[data-tex]')) tex(el, el.dataset.tex);
+    scene.resize();
+  });
 
   function render() {
     const L = LENSES.find(l => l.key === cur.lens);
@@ -220,11 +283,17 @@
         `${mode === 'two' ? ds.views[i].name + ' ' : ''}<b>${vs[i].toFixed(2)}</b>`).join(', ')}${
         Math.min(...which.map(i => vs[i])) > 0.97 ? ' (here it barely matters)' : ''}.</span>`);
     $('readout').innerHTML = L.readout(ds, mode, v);
+    for (const b of $('readout').querySelectorAll('[data-bar]')) {
+      const [bv, bk] = b.dataset.bar.split(':').map(Number);
+      b.onclick = () => { if (!scene.sel || scene.sel.v !== bv || scene.sel.k !== bk) scene.selectBar(bv, bk); else scene.selectBar(null); };
+    }
     renderRefs(L);
 
     scene.focus = v;
     scene.oneCloud = mode === 'one';
     $('tip').hidden = true;
+    scene.clearFeature();
+    $('feat').hidden = cur.lens !== 'ph';
     scene.reset();
     scene.set(Object.assign({ pics: pictures ? 1 : 0 }, L.scene(ds, mode, v), { labels: cur.labels ? 1 : 0 }));
     buildControls(L.controls || []);
@@ -299,6 +368,13 @@
         const nb = w => ds.views[w].nbrs[i].map(j => ds.labels[j]).join(', ');
         extra = `${ds.views[0].name}: ${nb(0)}<br>${ds.views[1].name}: ${nb(1)}`;
       }
+      if (cur.lens === 'procrustes') {
+        // what the rotation couldn't explain for this item, against everyone's median
+        const res = k => { const a = ds.procrustes.a[k], b = ds.procrustes.b[k]; return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); };
+        if (!ds._resMed) { const all = ds.labels.map((_, k) => res(k)).sort((p, q) => p - q); ds._resMed = all[all.length >> 1]; }
+        const r = res(i);
+        extra = (extra ? extra + '<br>' : '') + `left over after the fit: ${r.toFixed(2)} (median ${ds._resMed.toFixed(2)})`;
+      }
       const stack = scene.stackedWith(i, h.view).filter(j => j !== i);
       if (stack.length && cur.lens !== 'neighbors') {
         const names = stack.slice(0, 8).map(j => ds.labels[j]).join(', ') + (stack.length > 8 ? ` and ${stack.length - 8} more` : '');
@@ -307,7 +383,7 @@
       tip.querySelector('b').textContent = h.view === 1 && ds.labelsB ? ds.labelsB[i] : ds.labels[i];
       tip.querySelector('span').innerHTML = extra;
       const img = tip.querySelector('img');
-      if (ds.thumbs && !ds.glyphs) {
+      if (scene.showsThumbs()) {
         const im = img || tip.insertBefore(document.createElement('img'), tip.firstChild);
         im.src = scene.thumbURL(i);
       } else if (img) img.remove();
@@ -321,6 +397,63 @@
     y = Math.max(8, Math.min(y, innerHeight - r.height - 8));
     tip.style.left = x + 'px';
     tip.style.top = y + 'px';
+  };
+
+  // ---------- persistence features: tips and the caption line ----------
+
+  const DIMNAME = ['piece', 'loop', 'void'];
+  const names = (pts, max) => {
+    const L = ds.labels, list = pts.slice(0, max).map(i => L[i]).join(', ');
+    return list + (pts.length > max ? ` and ${pts.length - max} more` : '');
+  };
+  const life = f => f.death === null ? `born ε ${f.birth.toFixed(2)}, never dies` :
+    `born ε ${f.birth.toFixed(2)}, dies ε ${f.death.toFixed(2)}, lasts ${(f.death - f.birth).toFixed(2)}`;
+  function describe(f, long) {
+    const H = `H<sub>${f.dim}</sub>`;
+    if (!f.gen) {
+      return f.death === null
+        ? `${H} the last piece standing: everything, once it has all joined up.`
+        : `${H} ${DIMNAME[f.dim]} · ${life(f)}. ${f.located
+          ? 'Too short-lived to pin to particular points.'
+          : 'Where it lives hasn’t been worked out for this dataset yet.'}`;
+    }
+    const max = long ? 14 : 6;
+    if (f.dim === 0) return `${H} a piece of ${f.pts.length}: ${names(f.pts, max)} · ${life(f)}; the dashed edge joins it to the rest.`;
+    if (f.dim === 1) return `${H} a loop through ${f.pts.length}: ${names(f.pts, max)} · ${life(f)}; the dashed chord fills it in.`;
+    return `${H} a void · ${life(f)}. Solid: the edge that closes its shell (${names(f.edge, 2)}); dashed: the chord across the hollow that fills it (${names(f.chord, 2)}).`;
+  }
+  const FEAT_HINT = 'Point at a bar to see its feature in the cloud; click to keep it.';
+  scene.onFeature = f => {
+    $('feat').innerHTML = f ? describe(f, true) + ' <button class="clear" aria-label="let go">×</button>' : FEAT_HINT;
+    const x = $('feat').querySelector('.clear');
+    if (x) x.onclick = () => scene.selectBar(null);
+  };
+  function placeTip(tip, x0, y0) {
+    const r = tip.getBoundingClientRect();
+    let x = x0 + 16, y = y0 + 14;
+    if (x + r.width > innerWidth - 8) x = x0 - r.width - 16;
+    if (y + r.height > innerHeight - 8) y = y0 - r.height - 14;
+    tip.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+    tip.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+  }
+  scene.onTip = t => {
+    const tip = $('tip');
+    if (!t) { tip.hidden = true; return; }
+    const img = tip.querySelector('img');
+    if (img) img.remove();
+    if (t.bar) {
+      const f = t.bar;
+      tip.querySelector('b').innerHTML = `H<sub>${f.dim}</sub> ${DIMNAME[f.dim]}`;
+      tip.querySelector('span').innerHTML = describe(f, false).replace(/^H<sub>\d<\/sub> /, '') +
+        (f.gen ? `<br><i>${scene.sel === f ? 'click to let go' : 'click to keep it'}</i>` : '');
+    } else if (t.cell) {
+      const c = t.cell, L = ds.labels, pc = p => `${Math.round(p * 100)}%`;
+      tip.querySelector('b').textContent = `${L[c.i]} · ${L[c.j]}`;
+      tip.querySelector('span').innerHTML = ds.views.map((V, k) =>
+        `${V.name}: farther apart than ${pc(c.pct[k])} of pairs`).join('<br>');
+    }
+    tip.hidden = false;
+    placeTip(tip, t.x, t.y);
   };
 
   // ---------- boot ----------
@@ -346,11 +479,11 @@
     if (startHidden) toggleCaption(true);
     index = await fetch('data/index.json').then(r => r.json());
     addEventListener('keydown', e => {
-      if (e.key === 'Escape') return closePop();
-      if (e.target.tagName === 'INPUT') return;
+      if (e.key === 'Escape') { if (popFor) return closePop(); if (scene.sel) return scene.selectBar(null); return; }
+      if (e.target.tagName === 'INPUT' && !(popFor && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) return;
       if (!ds) return;
       if (popFor && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-        const opts = [...$('pop').querySelectorAll(':scope > button')], k = opts.indexOf(document.activeElement);
+        const opts = [...$('pop').querySelectorAll(':scope > button, button[data-id]:not([hidden])')], k = opts.indexOf(document.activeElement);
         if (!opts.length) return;
         opts[(k + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length].focus();
         e.preventDefault();

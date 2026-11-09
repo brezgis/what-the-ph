@@ -117,6 +117,10 @@ button { font: inherit; color: inherit; }
 .stat { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
 .stat .k { font: 400 14px/1 var(--mono); color: var(--ink-2); }
 .stat .v { font: 400 26px/1.1 var(--mono); letter-spacing: -.02em; }
+button.v { all: unset; font: 400 26px/1.1 var(--mono); letter-spacing: -.02em; cursor: pointer;
+  border-bottom: 1.5px dotted var(--ink-3); }
+button.v:hover { border-bottom-color: var(--ink); }
+button.v:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .stat .t { font: italic 400 16px/1.2 var(--serif); color: var(--ink-2); }
 .ctl { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto auto; align-items: center; gap: 10px;
   font: 400 15px/1 var(--mono); color: var(--ink-2); margin: 8px 0 0; }
@@ -177,3 +181,41 @@ body.cap-hidden .cap-toggle { position: static; }
   .eq .katex { font-size: 1em; }
 }
 .credit { margin: 12px 0 0; font: 400 13.5px/1.3 var(--mono); color: var(--ink-2); }
+
+/* ---- the feature under the pointer (persistent homology) ---- */
+.feat { margin: 6px 0 0; font: 400 14px/1.45 var(--mono); color: var(--ink-2); min-height: 2.9em;
+  -webkit-user-select: text; user-select: text; }
+.feat sub { font-size: .75em; }
+.feat .clear { all: unset; cursor: pointer; margin-left: .4em; padding: 0 .35em; border: 1px solid var(--ink-3);
+  border-radius: 999px; font: 400 13px/1.3 var(--mono); }
+.feat .clear:hover { border-color: var(--ink); color: var(--ink); }
+.tip i { font-style: normal; color: var(--ink-3); }
+
+/* ---- the dataset shelves ---- */
+.pop.wide { max-width: min(860px, calc(100vw - 16px)); width: 860px; padding: 12px 0 8px; }
+.pop .find {
+  all: unset; box-sizing: border-box; display: block; width: calc(100% - 32px); margin: 0 16px 10px;
+  padding: 7px 2px; border-bottom: 1px solid var(--ink-3); font: 400 15px/1.2 var(--mono); color: var(--ink);
+}
+.pop .find::placeholder { color: var(--ink-3); }
+.pop .find:focus { border-bottom-color: var(--ink); }
+.shelves { columns: 3 230px; column-gap: 8px; padding: 0 4px; }
+.shelves section { break-inside: avoid; margin: 0 0 10px; }
+.shelves h3 { margin: 4px 12px 4px; font: 500 12px/1.2 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.shelves button {
+  all: unset; display: block; box-sizing: border-box; width: 100%; cursor: pointer;
+  padding: 5px 12px; font: 400 17.5px/1.3 var(--serif); border-radius: 3px;
+}
+.shelves button:hover, .shelves button:focus { background: var(--hair); }
+.shelves button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.shelves button[aria-selected="true"] span { border-bottom: 1.5px solid var(--ink); }
+@media (max-width: 760px) { .pop.wide { width: auto; } .shelves { columns: 1; } }
+
+/* ---- phones: give the cloud the room; tools ride beside the title ---- */
+@media (max-width: 760px) {
+  .top .tools { order: 1; margin-left: auto; }
+  .top .sentence { order: 2; }
+  .tool { padding: 5px 9px; font-size: 13px; }
+  .caption { max-height: 34vh; }
+  .feat { font-size: 12.5px; min-height: 0; }
+}
