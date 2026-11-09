@@ -51,6 +51,18 @@ DATASETS = ['layers', 'clock', 'numbers', 'clocks', 'grambank', 'states', 'color
             'stars', 'cities', 'elements', 'songbirds', 'eggs', 'orbits', 'fungi', 'cellcycle',
             'candy', 'bobross']
 
+# What the dataset list calls each one; the official title stays in the ⓘ.
+# A dataset missing here falls back to its title.
+SHORT = {
+    'layers': 'calendar words', 'clock': 'aligned words', 'numbers': 'numbers', 'clocks': 'clock faces',
+    'grambank': 'world grammars', 'states': 'shapes of states', 'colors': 'Ekman’s colors',
+    'cortex': 'man & monkey IT', 'peterson': 'animals', 'turntable': 'objects on a turntable',
+    'doodles': 'Quick, Draw! doodles', 'mnist': 'handwritten digits', 'emoji': 'emoji', 'pokemon': 'Pokémon',
+    'stars': 'named stars', 'cities': 'cities & climate', 'elements': 'the elements',
+    'songbirds': 'birds that don’t exist', 'eggs': 'bird eggs', 'fungi': 'fungal DNA',
+    'cellcycle': 'the cell cycle', 'candy': 'Halloween candy', 'bobross': 'Bob Ross paintings',
+}
+
 
 GEO_K = 10  # neighbors in the graph that geodesic distance walks along
 
@@ -363,16 +375,26 @@ def build(ds_id):
               f'H1 bars={h1}  {gp.stat().st_size // 1024} KB')
 
 
+def write_index():
+    """data/index.json: what the dataset list needs, without opening every dataset."""
+    entries = []
+    for d in DATASETS:
+        if not (OUT / f'{d}.json').exists():
+            continue
+        base = json.loads((OUT / f'{d}.json').read_text())
+        entries.append({'id': d, 'title': base['title'], 'short': SHORT.get(d, base['title']),
+                        'views': [v['name'] for v in base['views']]})
+    (OUT / 'index.json').write_text(json.dumps(entries, ensure_ascii=False))
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['--index']:   # just the list (after editing SHORT)
+        write_index()
+        sys.exit()
     ids = sys.argv[1:] or DATASETS
     for ds in ids:
         if not (HERE / 'datasets' / f'{ds}.py').exists():
             print(f'{ds:9s} (no module yet, skipped)')
             continue
         build(ds)
-    manifest = [json.loads((OUT / f'{d}.json').read_text())['title'] for d in DATASETS
-                if (OUT / f'{d}.json').exists()]
-    (OUT / 'index.json').write_text(json.dumps(
-        [{'id': d, 'title': t} for d, t in zip(
-            [d for d in DATASETS if (OUT / f'{d}.json').exists()], manifest)],
-        ensure_ascii=False))
+    write_index()

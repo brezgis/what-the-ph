@@ -27,7 +27,8 @@ button { font: inherit; color: inherit; }
 /* ---- the sentence bar ---- */
 .top {
   position: fixed; top: 0; left: 0; right: 0; z-index: 3;
-  display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: baseline; gap: 10px 28px;
+  /* the sentence starts at a fixed place, so cycling datasets doesn't slide it around */
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 10px 28px;
   padding: 20px 36px 14px;
   background: linear-gradient(var(--paper) 70%, transparent);
 }
@@ -36,7 +37,7 @@ button { font: inherit; color: inherit; }
   font: italic 400 28px/1 var(--serif); color: var(--ink);
   text-decoration: none; letter-spacing: -.01em; white-space: nowrap;
 }
-.sentence { margin: 0; font: 400 24px/1.6 var(--serif); text-align: center; max-width: 980px; }
+.sentence { margin: 0; font: 400 24px/1.6 var(--serif); text-align: left; }
 .sentence .w { color: var(--ink-2); margin: 0 .28em; }
 .sentence .w:first-child { margin-left: 0; }
 .pick {
@@ -192,24 +193,42 @@ body.cap-hidden .cap-toggle { position: static; }
 .tip i { font-style: normal; color: var(--ink-3); }
 
 /* ---- the dataset shelves ---- */
-.pop.wide { max-width: min(860px, calc(100vw - 16px)); width: 860px; padding: 12px 0 8px; }
+.pop.wide { max-width: min(900px, calc(100vw - 16px)); width: 900px; padding: 12px 0 8px; }
 .pop .find {
   all: unset; box-sizing: border-box; display: block; width: calc(100% - 32px); margin: 0 16px 10px;
   padding: 7px 2px; border-bottom: 1px solid var(--ink-3); font: 400 15px/1.2 var(--mono); color: var(--ink);
 }
 .pop .find::placeholder { color: var(--ink-3); }
 .pop .find:focus { border-bottom-color: var(--ink); }
-.shelves { columns: 3 230px; column-gap: 8px; padding: 0 4px; }
-.shelves section { break-inside: avoid; margin: 0 0 10px; }
+.shelves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 6px; padding: 0 4px; }
+.shelves section { margin: 0 0 6px; min-width: 0; }
+.shelves section[hidden] { display: none; }
 .shelves h3 { margin: 4px 12px 4px; font: 500 12px/1.2 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
 .shelves button {
   all: unset; display: block; box-sizing: border-box; width: 100%; cursor: pointer;
-  padding: 5px 12px; font: 400 17.5px/1.3 var(--serif); border-radius: 3px;
+  padding: 4px 12px 5px; font: 400 17.5px/1.25 var(--serif); border-radius: 3px;
 }
+.shelves button[hidden] { display: none; }
+.shelves button small {
+  display: block; margin-top: 2px; font: 400 11.5px/1.35 var(--mono); color: var(--ink-3);
+  text-wrap: balance;   /* the whole comparison, on two lines if it needs them */
+}
+.shelves button:hover small, .shelves button:focus small { color: var(--ink-2); }
 .shelves button:hover, .shelves button:focus { background: var(--hair); }
 .shelves button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .shelves button[aria-selected="true"] span { border-bottom: 1.5px solid var(--ink); }
-@media (max-width: 760px) { .pop.wide { width: auto; } .shelves { columns: 1; } }
+@media (max-width: 900px) { .shelves { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .pop.wide { width: auto; } }
+
+/* ---- ‹ dataset › ---- */
+.dsbox { white-space: nowrap; }
+.dsbox .slot { display: inline-block; }   /* min-width set in main.js: the widest name */
+.step {
+  all: unset; cursor: pointer; display: inline-block; padding: 0 .22em;
+  font: 400 .8em/1 var(--serif); color: var(--ink-3); vertical-align: .05em;
+}
+.step:hover { color: var(--ink); }
+.step:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
 
 /* ---- phones: give the cloud the room; tools ride beside the title ---- */
 @media (max-width: 760px) {

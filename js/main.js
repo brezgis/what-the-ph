@@ -123,10 +123,48 @@
     return b;
   }
   function datasetPick() {
-    const b = pick(ds.title, [], cur.id, null, 'ds');
+    const b = pick(shortName(cur.id), [], cur.id, null, 'ds');
+    b.title = ds.title;
     b.onclick = () => openDatasets(b);
-    return b;
+    const arrow = (d, label) => {
+      const a = document.createElement('button');
+      a.className = 'step';
+      a.textContent = d < 0 ? '‹' : '›';
+      a.setAttribute('aria-label', label);
+      a.title = `${label}  (${d < 0 ? '[' : ']'})`;
+      a.onclick = () => stepDataset(d);
+      a.onpointerenter = () => { const o = order(); prefetch(o[(o.indexOf(cur.id) + d + o.length) % o.length]); };
+      return a;
+    };
+    const span = document.createElement('span');
+    span.className = 'dsbox';
+    const slot = document.createElement('span');   // fixed width; the name keeps its own underline
+    slot.className = 'slot';
+    slot.appendChild(b);
+    span.append(arrow(-1, 'previous dataset'), slot, arrow(1, 'next dataset'));
+    return span;
   }
+
+  // The dataset name sits in a slot as wide as the widest name, so the arrows
+  // and the rest of the sentence stay put while stepping through datasets.
+  const slotCache = new Map();
+  function slotWidth(b) {
+    const font = getComputedStyle(b).font;
+    if (!slotCache.has(font)) {
+      const probe = b.cloneNode(true);
+      Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', left: '-9999px' });
+      b.parentNode.appendChild(probe);
+      let w = 0;
+      for (const d of index) {
+        probe.firstChild.textContent = shortName(d.id);
+        w = Math.max(w, probe.getBoundingClientRect().width);
+      }
+      probe.remove();
+      slotCache.set(font, Math.ceil(w));
+    }
+    return slotCache.get(font);
+  }
+  if (document.fonts) document.fonts.ready.then(() => { slotCache.clear(); if (ds) renderSentence(LENSES.find(l => l.key === cur.lens)); });
   const word = t => Object.assign(document.createElement('span'), { className: 'w', textContent: t });
 
   function renderSentence(L) {
@@ -155,18 +193,32 @@
       pick(L.label, LENSES.map(l => ({ key: l.key, label: l.label, hint: l.modes.includes('one') ? '' : 'two clouds' })), cur.lens,
         k => select(cur.id, cur.metric, k, cur.view)),
     );
+    const slot = s.querySelector('.dsbox .slot');
+    // wide screens only: on a phone the sentence wraps anyway, and the gap would cost a line
+    slot.style.minWidth = innerWidth > 760 ? slotWidth(slot.firstChild) + 'px' : '';
   }
 
   // The dataset list, by what kind of thing it is. Anything not listed here
   // (a dataset added later) lands in "more".
   const SHELVES = [
-    ['language models', ['layers', 'clock', 'numbers', 'clocks', 'emoji']],
-    ['languages', ['grambank']],
-    ['minds & brains', ['states', 'colors', 'cortex', 'peterson']],
-    ['pictures', ['turntable', 'doodles', 'mnist', 'pokemon', 'bobross', 'songbirds']],
-    ['the natural world', ['stars', 'cities', 'elements', 'eggs', 'fungi', 'cellcycle']],
-    ['everything else', ['candy']],
+    ['language', ['clock', 'layers', 'numbers', 'emoji', 'clocks', 'grambank']],
+    ['minds & brains', ['colors', 'states', 'peterson', 'cortex']],
+    ['pictures', ['mnist', 'doodles', 'turntable', 'pokemon', 'bobross', 'songbirds']],
+    ['the world', ['stars', 'cities', 'elements', 'eggs', 'fungi', 'cellcycle', 'candy']],
   ];
+  const entry = id => index.find(d => d.id === id) || { id, title: id };
+  const shortName = id => entry(id).short || entry(id).title;
+  // every dataset in shelf order (anything unshelved at the end): what ‹ › and [ ] step through
+  function order() {
+    const placed = SHELVES.flatMap(s => s[1]).filter(id => index.some(d => d.id === id));
+    return placed.concat(index.map(d => d.id).filter(id => !placed.includes(id)));
+  }
+  function stepDataset(d) {
+    const o = order(), k = o.indexOf(cur.id);
+    const id = o[(k + d + o.length) % o.length];
+    prefetch(o[(k + 2 * d + 2 * o.length) % o.length]);   // and the one after that, ahead of time
+    select(id, cur.metric, cur.lens, cur.view);
+  }
 
   function prefetch(id) {
     getBase(id).then(b => getGeo(id, b.defaultMetric)).catch(() => {});
@@ -177,17 +229,18 @@
     if (popFor === btn) return closePop();
     const placed = new Set(SHELVES.flatMap(s => s[1]));
     const shelves = SHELVES.map(([name, ids]) => [name, ids.filter(id => index.some(d => d.id === id))])
-      .concat([['more', index.filter(d => !placed.has(d.id)).map(d => d.id)]])
+      .concat([['new', index.filter(d => !placed.has(d.id)).map(d => d.id)]])
       .filter(s => s[1].length);
-    const title = id => index.find(d => d.id === id).title;
+    const hint = id => (entry(id).views || []).join(' vs ');
     pop.innerHTML = `<input class="find" type="search" placeholder="find a dataset" aria-label="find a dataset">
       <div class="shelves">${shelves.map(([name, ids]) => `<section><h3>${name}</h3>${ids.map(id =>
-        `<button role="option" data-id="${id}" aria-selected="${id === cur.id}"><span>${title(id)}</span></button>`).join('')}</section>`).join('')}</div>`;
+        `<button role="option" data-id="${id}" aria-selected="${id === cur.id}" title="${entry(id).title.replace(/"/g, '&quot;')}">` +
+        `<span>${shortName(id)}</span><small>${hint(id)}</small></button>`).join('')}</section>`).join('')}</div>`;
     pop.classList.add('wide');
     const find = pop.querySelector('.find');
     find.oninput = () => {
       const q = find.value.trim().toLowerCase();
-      for (const b of pop.querySelectorAll('button[data-id]')) b.hidden = q && !(b.textContent + ' ' + b.dataset.id).toLowerCase().includes(q);
+      for (const b of pop.querySelectorAll('button[data-id]')) b.hidden = q && !(b.textContent + ' ' + b.title + ' ' + b.dataset.id).toLowerCase().includes(q);
       for (const sec of pop.querySelectorAll('section')) sec.hidden = ![...sec.querySelectorAll('button')].some(b => !b.hidden);
     };
     find.onkeydown = e => {
@@ -461,7 +514,8 @@
   function readHash() {
     const [id, metric, lens, view] = location.hash.slice(1).split('/');
     return {
-      id: index.some(d => d.id === id) ? id : index[0].id,
+      // no link (or a stale one): somewhere new each time the page opens
+      id: index.some(d => d.id === id) ? id : index[Math.floor(Math.random() * index.length)].id,
       metric: metric || null,
       lens: lens || 'shape',
       view: view || 'a',
@@ -489,6 +543,8 @@
         e.preventDefault();
         return;
       }
+      if (e.key === '[') { e.preventDefault(); stepDataset(-1); }
+      if (e.key === ']') { e.preventDefault(); stepDataset(1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
       if (e.key === '+' || e.key === '=') scene.zoomBy(1.25);

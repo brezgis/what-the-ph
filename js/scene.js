@@ -83,19 +83,9 @@
       this.ink = s.getPropertyValue('--ink').trim();
     }
 
-    // Resolution: full device sharpness when still. While things move, if frames
-    // get slow (Retina screens paint 4× the pixels), drop to a lower resolution,
-    // remember what worked, and snap back to full sharpness when motion stops.
-    setRenderScale(dpr) {
-      if (dpr === this.renderDpr) return;
-      this.renderDpr = dpr;
-      this.resize();
-    }
-
     resize() {
-      this.maxDpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (!this.renderDpr || this.renderDpr > this.maxDpr) this.renderDpr = this.maxDpr;
-      const dpr = this.renderDpr;
+      // always full sharpness (up to 2×): drawing is cheap enough not to trade it away
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (this.W !== innerWidth || this.H !== innerHeight || this.dpr !== dpr) {
         this.W = innerWidth;
         this.H = innerHeight;
@@ -106,7 +96,13 @@
       }
       // the stage is whatever the sentence bar and the caption leave free
       const top = document.querySelector('.top'), cap = document.querySelector('.caption');
-      const hb = top ? top.getBoundingClientRect().bottom : 70;
+      let hb = top ? top.getBoundingClientRect().bottom : 70;
+      if (top && innerWidth > 760) {
+        // on wide screens the stage starts below a one-line header, whatever the sentence
+        // does: a long one wrapping to a second line must not shrink or shift the cloud
+        const ts = getComputedStyle(top), ss = getComputedStyle(top.querySelector('.sentence'));
+        hb = top.getBoundingClientRect().top + parseFloat(ts.paddingTop) + parseFloat(ss.lineHeight) + parseFloat(ts.paddingBottom);
+      }
       const cb = cap ? cap.getBoundingClientRect().top : this.H;
       const narrow = this.W <= 760;
       const side = narrow ? 12 : 36;
@@ -126,6 +122,7 @@
       if (!(opts && opts.keepView)) { this.zoom = 1; this.pan = { x: 0, y: 0 }; this.viewGoal = null; }
       this.ds = ds;
       this.textW = null;
+      this.labelFade = null;
       const n = ds.n;
       this.n = n;
       // Fit the bulk of each cloud to the frame, then pull outliers in softly, so
@@ -517,6 +514,7 @@
       this.pan.x = px - cx - k * (px - cx - this.pan.x);
       this.pan.y = py - cy - k * (py - cy - this.pan.y);
       this.zoom = z;
+      this.zoomedAt = performance.now();
       this.viewGoal = null;
       this.dirty = true;
     }
@@ -602,9 +600,11 @@
         cx: cx0.map(c => c + this.pan.x),
         cy: cy0 + this.pan.y,
         R: R0 * this.zoom,
-        clip: side
-          ? { x: cloud.x - 30, y: y - 6, w: cloud.w + 26, h: h + 6 }
-          : { x: x - 30, y: y - 6, w: w + 60, h: cloud.h + 6 },
+        // the cloud is only kept off the figure; at the screen's edges it runs on under
+        // the header's fade and behind the caption, rather than being cut off in mid-air
+        clip: P.fig < 0.02 ? { x: 0, y: 0, w: this.W, h: this.H }
+          : side ? { x: 0, y: 0, w: cloud.x + cloud.w - 2, h: this.H }
+          : { x: 0, y: 0, w: this.W, h: cloud.y + cloud.h - 2 },
         fig, divider,
       };
     }
@@ -854,6 +854,7 @@
       if (this.viewGoal) {
         const g = this.viewGoal, k = Math.min(1, dt * 7);
         this.zoom += (g.zoom - this.zoom) * k;
+        this.zoomedAt = performance.now();
         this.pan.x += (g.x - this.pan.x) * k;
         this.pan.y += (g.y - this.pan.y) * k;
         if (Math.abs(this.zoom - g.zoom) < 1e-3 && Math.hypot(this.pan.x - g.x, this.pan.y - g.y) < 0.5) {
@@ -877,34 +878,18 @@
       if (Math.abs(this.spinBSpeed) < 0.01) this.spinBSpeed = 0;
       // nothing moving and nothing changed: skip the frame (saves the battery)
       const moving = Object.keys(this.tw).length || this.spinSpeed || this.spinBSpeed || this.viewGoal || this.drag;
-      this.adaptResolution(moving, dt, now);
-      if (moving || this.dirty) this.draw();
+      this.moving = !!moving;
+      this.dt = dt;
+      if (this.wasMoving && !moving) this.dirty = true;   // one last frame, snapped crisp
+      this.wasMoving = !!moving;
+      // cleared before drawing, so a draw can ask for another frame (fades, settling sprites)
+      const dirty = this.dirty;
       this.dirty = false;
+      if (moving || dirty) this.draw();
       requestAnimationFrame(t => this.frame(t));
     }
 
     invalidate() { this.dirty = true; }
-
-    adaptResolution(moving, dt, now) {
-      const full = this.maxDpr;
-      if (moving) {
-        this.stillSince = 0;
-        // motion resumed: start at the resolution that kept up last time
-        if (this.renderDpr === full && this.motionDpr && this.motionDpr < full) this.setRenderScale(this.motionDpr);
-        this.frameEma = this.frameEma ? 0.85 * this.frameEma + 0.15 * dt * 1000 : dt * 1000;
-        this.slowFrames = this.frameEma > 24 ? (this.slowFrames || 0) + 1 : 0;
-        if (this.slowFrames > 12 && this.renderDpr > 1) {
-          this.setRenderScale(Math.max(1, Math.round((this.renderDpr - 0.5) * 2) / 2));
-          this.motionDpr = this.renderDpr;
-          this.slowFrames = 0;
-          this.frameEma = 0;
-        }
-      } else if (this.renderDpr < full) {
-        // settled for a moment: one crisp redraw at full resolution
-        if (!this.stillSince) this.stillSince = now;
-        else if (now - this.stillSince > 180) { this.setRenderScale(full); this.dirty = true; }
-      }
-    }
 
     draw() {
       const ctx = this.ctx, P = this.P;
@@ -985,14 +970,14 @@
     // Sprites pre-scaled to the size they are drawn at, in device pixels: every
     // frame is then a 1:1 copy (crisp, and cheap), and resampling happens once,
     // with good filtering, only when the size changes (zoom, resize).
-    spritesAt(ps) {
+    spritesAt(ps, exact) {
       const dpr = this.dpr, want = Math.max(8, Math.min(360, ps * dpr));
-      const S = Math.round(Math.pow(2, Math.round(Math.log2(want) * 6) / 6));   // sixth-octave steps
+      const S = exact ? Math.round(want) : Math.round(Math.pow(2, Math.round(Math.log2(want) * 6) / 6));
       // a few sizes at once: two clouds can want different ones
       if (!this.scaled || this.scaled.src !== this.tinted) this.scaled = { src: this.tinted, sizes: new Map() };
       const hit = this.scaled.sizes.get(S);
       if (hit) return hit;
-      if (this.scaled.sizes.size >= 4) this.scaled.sizes.delete(this.scaled.sizes.keys().next().value);
+      if (this.scaled.sizes.size >= 6) this.scaled.sizes.delete(this.scaled.sizes.keys().next().value);
       const pixel = PIXEL_ART.has(this.ds.id);
       const out = this.tinted.map(im => {
         const asp = im.height / im.width;
@@ -1038,7 +1023,7 @@
         al[i] = x;
       }
       if (pics < 1) {
-        const LV = 8, buckets = new Map();
+        const LV = 24, buckets = new Map();   // fine steps: no visible blink as a point turns through depth
         for (let i = 0; i < n; i++) {
           const kind = g ? GLYPHS[g[i] % GLYPHS.length] : 'dot';
           const key = kind + Math.round(al[i] * LV);
@@ -1061,14 +1046,20 @@
         for (let i = 0; i < n; i++) order[i] = i;
         const z = this.sz[v];
         order.sort((p, q) => z[p] - z[q] || p - q);   // ties broken by index: no swapping
-        const SP = this.spritesAt(ps), dpr = this.dpr;
+        // while zooming, the nearest cached size, scaled smoothly to the exact one; once the
+        // zoom settles, sprites at exactly this size, drawn 1:1 on whole device pixels
+        const settled = performance.now() - (this.zoomedAt || 0) > 250;
+        const SP = this.spritesAt(ps, settled), dpr = this.dpr, snap = !this.moving;
+        const scale = settled ? 1 : (ps * dpr) / SP.S;   // settled: the sprite is already the right size
         for (let k = 0; k < n; k++) {
           const i = order[k], im = SP.imgs[i];
-          const w = im.width / dpr, h = im.height / dpr;
+          const w = (im.width * scale) / dpr, h = (im.height * scale) / dpr;
           ctx.globalAlpha = a * pics * (0.55 + 0.45 * al[i]) * (mask && !mask[i] ? 0.45 : 1);
-          // land on whole device pixels, so the copy stays 1:1
-          ctx.drawImage(im, Math.round((sx[i] - w / 2) * dpr) / dpr, Math.round((sy[i] - h / 2) * dpr) / dpr, w, h);
+          let x = sx[i] - w / 2, y = sy[i] - h / 2;
+          if (snap) { x = Math.round(x * dpr) / dpr; y = Math.round(y * dpr) / dpr; }
+          ctx.drawImage(im, x, y, w, h);
         }
+        if (!settled) this.dirty = true;   // come back to draw the settled, exact size
       }
       if (this.hover >= 0) {   // in both clouds: the item and its twin
         const i = this.hover, x = sx[i], y = sy[i];
@@ -1144,7 +1135,7 @@
       const was = this.shownLabels && this.shownLabels[v] || new Set();
       const groups = [...spots.values()].sort((p, q) =>
         (was.has(q[0]) - was.has(p[0])) || (q.length - p.length) || (p[0] - q[0]));
-      const now = new Set();
+      const now = new Map();   // item -> its label text, for every label placed this frame
       const C = this.lastClip;
       for (const items of groups) {
         const i = items[0];
@@ -1154,12 +1145,27 @@
         const box = [x - 2, y - 9, x + w + 2, y + 9];
         if (placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
         placed.push(box);
-        now.add(i);
-        ctx.globalAlpha = a * this.depthAlpha(v, i);
-        const sp = this.labelSprite(text);
-        ctx.drawImage(sp, Math.round(x * this.dpr) / this.dpr - 2, Math.round((y - 11) * this.dpr) / this.dpr, sp.width / this.dpr, sp.height / this.dpr);
+        now.set(i, text);
       }
-      (this.shownLabels = this.shownLabels || [])[v] = now;
+      // Labels fade in and out (~0.1 s) instead of popping as the cloud turns and
+      // they bump into each other; one that lost its place finishes fading where it is.
+      const fades = (this.labelFade = this.labelFade || [])[v] || (this.labelFade[v] = new Map());
+      const k = Math.min(1, (this.dt || 0.016) * 12);
+      for (const [i, text] of now) if (!fades.has(i)) fades.set(i, { a: 0, text });
+      const dpr = this.dpr, snap = !this.moving;
+      for (const [i, f] of fades) {
+        const on = now.has(i);
+        if (on) f.text = now.get(i);
+        f.a += ((on ? 1 : 0) - f.a) * k;
+        if (!on && f.a < 0.03) { fades.delete(i); continue; }
+        if (Math.abs((on ? 1 : 0) - f.a) > 0.01) this.dirty = true;   // still fading: keep drawing
+        ctx.globalAlpha = a * f.a * this.depthAlpha(v, i);
+        const sp = this.labelSprite(f.text);
+        let x = this.sx[v][i] + 8, y = this.sy[v][i] - 21;
+        if (snap) { x = Math.round(x * dpr) / dpr; y = Math.round(y * dpr) / dpr; }
+        ctx.drawImage(sp, x, y, sp.width / dpr, sp.height / dpr);
+      }
+      (this.shownLabels = this.shownLabels || [])[v] = new Set(now.keys());
     }
 
     // a label rendered once at device resolution; drawing a bitmap is far cheaper than text
