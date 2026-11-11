@@ -145,8 +145,9 @@
     return span;
   }
 
-  // The dataset name sits in a slot as wide as the widest name, so the arrows
-  // and the rest of the sentence stay put while stepping through datasets.
+  // The dataset name sits centered in a slot that fits most names, so the
+  // arrows and the rest of the sentence stay put for most steps without leaving a
+  // long gap after a short name. Only the few longest names push the sentence along.
   const slotCache = new Map();
   function slotWidth(b) {
     const font = getComputedStyle(b).font;
@@ -154,13 +155,12 @@
       const probe = b.cloneNode(true);
       Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', left: '-9999px' });
       b.parentNode.appendChild(probe);
-      let w = 0;
-      for (const d of index) {
+      const ws = index.map(d => {
         probe.firstChild.textContent = shortName(d.id);
-        w = Math.max(w, probe.getBoundingClientRect().width);
-      }
+        return probe.getBoundingClientRect().width;
+      }).sort((a, b) => a - b);
       probe.remove();
-      slotCache.set(font, Math.ceil(w));
+      slotCache.set(font, Math.ceil(ws[Math.floor((ws.length - 1) * 0.6)]));
     }
     return slotCache.get(font);
   }

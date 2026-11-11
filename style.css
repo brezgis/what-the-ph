@@ -222,7 +222,7 @@ body.cap-hidden .cap-toggle { position: static; }
 
 /* ---- ‹ dataset › ---- */
 .dsbox { white-space: nowrap; }
-.dsbox .slot { display: inline-block; }   /* min-width set in main.js: the widest name */
+.dsbox .slot { display: inline-block; text-align: center; }   /* min-width set in main.js */
 .step {
   all: unset; cursor: pointer; display: inline-block; padding: 0 .22em;
   font: 400 .8em/1 var(--serif); color: var(--ink-3); vertical-align: .05em;
